@@ -109,6 +109,7 @@ model Property {
 
   landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
   units         Unit[]
+  invitations   TenantInvitation[]
   leases        Lease[]
   payments      Payment[]
   expenses      Expense[]

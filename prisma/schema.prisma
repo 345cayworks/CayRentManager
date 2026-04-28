@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppRole {
+  superadmin
+  landlord
+  property_manager
+  accountant
+  tenant
+}
+
+enum RecordStatus {
+  active
+  inactive
+  archived
+  pending
+  disabled
+  voided
+  terminated
+  closed
+}
+
+model AppUser {
+  id              String    @id @default(cuid())
+  authProviderId  String?   @unique
+  email           String    @unique
+  fullName        String
+  phone           String?
+  role            AppRole
+  status          RecordStatus @default(active)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+  disabledAt      DateTime?
+  disabledBy      String?
+  disabledReason  String?
+
+  ownedLandlords  LandlordProfile[] @relation("LandlordOwner")
+  memberships     LandlordMembership[]
+  tenantProfile   Tenant?
+  sentMessages    Message[] @relation("Sender")
+  receivedMessages Message[] @relation("Receiver")
+  auditActions    AuditLog[] @relation("AuditActor")
+}
+
+model LandlordProfile {
+  id            String    @id @default(cuid())
+  ownerUserId   String
+  companyName   String
+  displayName   String
+  status        RecordStatus @default(active)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  archivedAt    DateTime?
+  archivedBy    String?
+
+  owner         AppUser   @relation("LandlordOwner", fields: [ownerUserId], references: [id])
+  memberships   LandlordMembership[]
+  properties    Property[]
+  units         Unit[]
+  tenants       Tenant[]
+  invitations   TenantInvitation[]
+  leases        Lease[]
+  payments      Payment[]
+  expenses      Expense[]
+  maintenanceRequests MaintenanceRequest[]
+  documents     Document[]
+  messages      Message[]
+  auditLogs     AuditLog[]
+}
+
+model LandlordMembership {
+  id          String      @id @default(cuid())
+  landlordId  String
+  userId      String
+  role        AppRole
+  status      RecordStatus @default(active)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  landlord    LandlordProfile @relation(fields: [landlordId], references: [id])
+  user        AppUser         @relation(fields: [userId], references: [id])
+
+  @@unique([landlordId, userId])
+}
+
+model Property {
+  id            String     @id @default(cuid())
+  landlordId    String
+  name          String
+  address       String
+  city          String
+  state         String
+  country       String
+  propertyType  String
+  purchasePrice Decimal?
+  estimatedValue Decimal?
+  status        RecordStatus @default(active)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  archivedAt    DateTime?
+  archivedBy    String?
+
+  landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
+  units         Unit[]
+  leases        Lease[]
+  payments      Payment[]
+  expenses      Expense[]
+  maintenanceRequests MaintenanceRequest[]
+  documents     Document[]
+}
+
+model Unit {
+  id            String     @id @default(cuid())
+  landlordId    String
+  propertyId    String
+  unitName      String
+  bedrooms      Int?
+  bathrooms     Decimal?
+  squareFeet    Int?
+  rentAmount    Decimal
+  depositAmount Decimal?
+  status        RecordStatus @default(active)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  archivedAt    DateTime?
+  archivedBy    String?
+
+  landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
+  property      Property    @relation(fields: [propertyId], references: [id])
+  invitations   TenantInvitation[]
+  leases        Lease[]
+  payments      Payment[]
+  expenses      Expense[]
+  maintenanceRequests MaintenanceRequest[]
+  documents     Document[]
+}
+
+model Tenant {
+  id                    String      @id @default(cuid())
+  landlordId            String
+  userId                String?     @unique
+  fullName              String
+  email                 String
+  phone                 String?
+  employer              String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  status                RecordStatus @default(active)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  deactivatedAt         DateTime?
+  deactivatedBy         String?
+
+  landlord              LandlordProfile @relation(fields: [landlordId], references: [id])
+  user                  AppUser?        @relation(fields: [userId], references: [id])
+  leases                Lease[]
+  payments              Payment[]
+  maintenanceRequests   MaintenanceRequest[]
+  documents             Document[]
+
+  @@unique([landlordId, email])
+}
+
+model TenantInvitation {
+  id          String      @id @default(cuid())
+  landlordId  String
+  propertyId  String?
+  unitId      String?
+  email       String
+  phone       String?
+  inviteToken String      @unique
+  status      RecordStatus @default(pending)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  landlord    LandlordProfile @relation(fields: [landlordId], references: [id])
+  property    Property?   @relation(fields: [propertyId], references: [id])
+  unit        Unit?       @relation(fields: [unitId], references: [id])
+}
+
+model Lease {
+  id            String      @id @default(cuid())
+  landlordId    String
+  propertyId    String
+  unitId        String
+  tenantId      String
+  startDate     DateTime
+  endDate       DateTime
+  rentAmount    Decimal
+  depositAmount Decimal?
+  lateFeeAmount Decimal?
+  status        RecordStatus @default(active)
+  leasePdfUrl   String?
+  signedPdfUrl  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  terminatedAt  DateTime?
+  terminatedBy  String?
+
+  landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
+  property      Property       @relation(fields: [propertyId], references: [id])
+  unit          Unit           @relation(fields: [unitId], references: [id])
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  payments      Payment[]
+  documents     Document[]
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  landlordId    String
+  tenantId      String
+  leaseId       String
+  propertyId    String
+  unitId        String
+  dueDate       DateTime
+  paymentDate   DateTime?
+  amountDue     Decimal
+  amountPaid    Decimal?
+  balance       Decimal
+  paymentMethod String?
+  status        RecordStatus @default(pending)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  voidedAt      DateTime?
+  voidedBy      String?
+
+  landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  lease         Lease          @relation(fields: [leaseId], references: [id])
+  property      Property       @relation(fields: [propertyId], references: [id])
+  unit          Unit           @relation(fields: [unitId], references: [id])
+}
+
+model Expense {
+  id            String      @id @default(cuid())
+  landlordId    String
+  propertyId    String
+  unitId        String?
+  category      String
+  vendor        String?
+  amount        Decimal
+  expenseDate   DateTime
+  receiptUrl    String?
+  description   String?
+  status        RecordStatus @default(active)
+  createdBy     String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  voidedAt      DateTime?
+  voidedBy      String?
+
+  landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
+  property      Property       @relation(fields: [propertyId], references: [id])
+  unit          Unit?          @relation(fields: [unitId], references: [id])
+}
+
+model MaintenanceRequest {
+  id             String      @id @default(cuid())
+  landlordId     String
+  tenantId       String?
+  propertyId     String
+  unitId         String?
+  title          String
+  description    String
+  priority       String
+  status         RecordStatus @default(pending)
+  estimatedCost  Decimal?
+  finalCost      Decimal?
+  contractorName String?
+  photoUrl       String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  archivedAt     DateTime?
+  archivedBy     String?
+
+  landlord       LandlordProfile @relation(fields: [landlordId], references: [id])
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id])
+  property       Property        @relation(fields: [propertyId], references: [id])
+  unit           Unit?           @relation(fields: [unitId], references: [id])
+}
+
+model Document {
+  id            String      @id @default(cuid())
+  landlordId    String
+  propertyId    String?
+  unitId        String?
+  tenantId      String?
+  leaseId       String?
+  documentType  String
+  fileName      String
+  fileUrl       String
+  status        RecordStatus @default(active)
+  uploadedBy    String
+  createdAt     DateTime    @default(now())
+  archivedAt    DateTime?
+  archivedBy    String?
+
+  landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
+  property      Property?       @relation(fields: [propertyId], references: [id])
+  unit          Unit?           @relation(fields: [unitId], references: [id])
+  tenant        Tenant?         @relation(fields: [tenantId], references: [id])
+  lease         Lease?          @relation(fields: [leaseId], references: [id])
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  landlordId  String
+  senderId    String
+  receiverId  String
+  propertyId  String?
+  unitId      String?
+  subject     String
+  message     String
+  readAt      DateTime?
+  createdAt   DateTime    @default(now())
+
+  landlord    LandlordProfile @relation(fields: [landlordId], references: [id])
+  sender      AppUser         @relation("Sender", fields: [senderId], references: [id])
+  receiver    AppUser         @relation("Receiver", fields: [receiverId], references: [id])
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  landlordId   String?
+  actorUserId  String
+  actorEmail   String
+  action       String
+  entityType   String
+  entityId     String
+  targetUserId String?
+  targetEmail  String?
+  details      Json
+  createdAt    DateTime    @default(now())
+
+  landlord     LandlordProfile? @relation(fields: [landlordId], references: [id])
+  actor        AppUser          @relation("AuditActor", fields: [actorUserId], references: [id])
+}

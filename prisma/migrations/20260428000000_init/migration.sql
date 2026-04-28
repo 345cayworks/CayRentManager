@@ -1,0 +1,3 @@
+-- Initial production schema for RentFlow Manager.
+-- Apply with: npx prisma migrate deploy
+-- NOTE: Generate this SQL from schema in CI/CD with `prisma migrate dev` before first production deployment.

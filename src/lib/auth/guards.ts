@@ -43,7 +43,7 @@ export async function requireAuth(): Promise<AuthContext> {
 
 export async function requireRole(allowed: UserRole[]) {
   const user = await requireAuth();
-  if (!allowed.includes(user.role)) redirect('/dashboard?error=forbidden');
+  if (!allowed.includes(user.role)) redirect('/unauthorized');
   return user;
 }
 
@@ -72,7 +72,7 @@ export async function requireLandlordAccess(landlordId: string) {
     where: { landlordId, userId: user.userId, status: 'ACTIVE', landlord: { status: 'ACTIVE' } },
   });
 
-  if (!membership) redirect('/dashboard?error=landlord-scope');
+  if (!membership) redirect('/unauthorized');
   return user;
 }
 
@@ -84,7 +84,7 @@ export async function requireTenantAccess(tenantId: string) {
     where: { id: tenantId, userId: user.userId, status: 'ACTIVE' },
   });
 
-  if (!tenant) redirect('/tenant/dashboard?error=tenant-scope');
+  if (!tenant) redirect('/unauthorized');
   return user;
 }
 

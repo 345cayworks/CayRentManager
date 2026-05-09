@@ -334,6 +334,10 @@ export async function ensureSuperadminAction() {
 }
 
 export async function signInWithGoogleAction() {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    redirect('/login?error=google-not-configured');
+  }
+
   await signIn('google', { redirectTo: '/dashboard' });
 }
 

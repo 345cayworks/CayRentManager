@@ -4,14 +4,18 @@ import Google from 'next-auth/providers/google';
 import { UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 
+const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-    }),
-  ],
+  providers: googleConfigured
+    ? [
+        Google({
+          clientId: process.env.GOOGLE_CLIENT_ID!,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        }),
+      ]
+    : [],
   trustHost: true,
   pages: {
     signIn: '/login',

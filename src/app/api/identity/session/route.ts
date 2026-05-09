@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
+import { getUser as getNetlifyIdentityUser } from '@netlify/identity';
 import { UserStatus } from '@prisma/client';
 import { createAppSession } from '@/lib/auth/session';
 import { syncIdentityUser } from '@/lib/identity/sync';
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const netlifyUserId = String(body?.netlifyUserId ?? '');
-  const email = String(body?.email ?? '').toLowerCase();
-  const fullName = body?.fullName ? String(body.fullName) : null;
+  const identityUser = await getNetlifyIdentityUser();
+  const netlifyUserId = identityUser?.id ?? '';
+  const email = String(identityUser?.email ?? '').toLowerCase();
+  const fullName = body?.fullName ? String(body.fullName) : identityUser?.name ?? null;
 
   if (!netlifyUserId || !email) {
-    return NextResponse.json({ error: 'Netlify Identity user id and email are required.' }, { status: 400 });
+    return NextResponse.json({ error: 'A valid Netlify Identity session is required.' }, { status: 401 });
   }
 
   const { user, createdWorkspace } = await syncIdentityUser({ netlifyUserId, email, fullName });

@@ -7,8 +7,6 @@ import { getCurrentIdentityUser, initializeIdentity, login, signup } from '@/lib
 function identityPayload(user: any, fullName: string, token: string) {
   return {
     token,
-    netlifyUserId: String(user.id ?? user.sub ?? ''),
-    email: String(user.email ?? ''),
     fullName: fullName || user.name || user.user_metadata?.full_name || user.email,
   };
 }

@@ -8,8 +8,6 @@ type Mode = 'login' | 'signup';
 
 function identityPayload(user: any, fullName?: string) {
   return {
-    netlifyUserId: String(user.id ?? user.sub ?? ''),
-    email: String(user.email ?? ''),
     fullName: fullName || user.name || user.user_metadata?.full_name || user.user_metadata?.name || user.email,
   };
 }

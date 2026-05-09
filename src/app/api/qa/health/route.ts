@@ -7,6 +7,7 @@ const expectedTables = [
   'Account',
   'Session',
   'VerificationToken',
+  'AppSession',
   'LandlordProfile',
   'LandlordMembership',
   'Property',

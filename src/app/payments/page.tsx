@@ -2,7 +2,7 @@ import { PaymentStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { recordPaymentAction } from '@/server/actions';
+import { recordPaymentAction, voidPaymentAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +35,13 @@ export default async function Page() {
               <p className="font-medium">{payment.tenant.fullName} / {payment.unit.unitName}</p>
               <p className="text-sm text-slate-600">Due {payment.dueDate.toLocaleDateString()} / {payment.status}</p>
             </div>
-            <p className="font-medium">${Number(payment.amountPaid ?? 0).toFixed(2)}</p>
+            <div className="text-right space-y-2">
+              <p className="font-medium">${Number(payment.amountPaid ?? 0).toFixed(2)}</p>
+              <form action={voidPaymentAction}>
+                <input type="hidden" name="paymentId" value={payment.id} />
+                <button className="text-sm rounded border px-3 py-1">Void</button>
+              </form>
+            </div>
           </div>
         ))}
       </div>

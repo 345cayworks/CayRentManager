@@ -1,6 +1,7 @@
 import { Shell } from '@/components/shell';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { disableUserAction, reactivateUserAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,13 @@ export default async function Page() {
               <p className="font-medium">{user.fullName ?? user.name ?? user.email}</p>
               <p className="text-sm text-slate-600">{user.email}</p>
             </div>
-            <p className="text-sm">{user.role} / {user.status}</p>
+            <div className="text-right space-y-2">
+              <p className="text-sm">{user.role} / {user.status}</p>
+              <form action={user.status === 'DISABLED' ? reactivateUserAction : disableUserAction}>
+                <input type="hidden" name="userId" value={user.id} />
+                <button className="text-sm rounded border px-3 py-1">{user.status === 'DISABLED' ? 'Reactivate' : 'Disable'}</button>
+              </form>
+            </div>
           </div>
         ))}
       </div>

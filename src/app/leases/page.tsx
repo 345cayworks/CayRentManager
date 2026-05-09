@@ -2,7 +2,7 @@ import { LeaseStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { createLeaseAction } from '@/server/actions';
+import { createLeaseAction, expireLeaseAction, terminateLeaseAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,21 @@ export default async function Page() {
               <p className="font-medium">{lease.tenant.fullName} / {lease.property.name} / {lease.unit.unitName}</p>
               <p className="text-sm text-slate-600">{lease.startDate.toLocaleDateString()} to {lease.endDate.toLocaleDateString()}</p>
             </div>
-            <p className={lease.status === LeaseStatus.ACTIVE ? 'text-green-700' : 'text-slate-600'}>{lease.status}</p>
+            <div className="text-right space-y-2">
+              <p className={lease.status === LeaseStatus.ACTIVE ? 'text-green-700' : 'text-slate-600'}>{lease.status}</p>
+              {lease.status === LeaseStatus.ACTIVE ? (
+                <div className="flex gap-2">
+                  <form action={terminateLeaseAction}>
+                    <input type="hidden" name="leaseId" value={lease.id} />
+                    <button className="text-sm rounded border px-3 py-1">Terminate</button>
+                  </form>
+                  <form action={expireLeaseAction}>
+                    <input type="hidden" name="leaseId" value={lease.id} />
+                    <button className="text-sm rounded border px-3 py-1">Expire</button>
+                  </form>
+                </div>
+              ) : null}
+            </div>
           </div>
         ))}
       </div>

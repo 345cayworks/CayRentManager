@@ -2,7 +2,7 @@ import { RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { recordExpenseAction } from '@/server/actions';
+import { recordExpenseAction, voidExpenseAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +40,13 @@ export default async function Page() {
               <p className="font-medium">{expense.category}</p>
               <p className="text-sm text-slate-600">{expense.property.name}{expense.unit ? ` / ${expense.unit.unitName}` : ''}</p>
             </div>
-            <p className="font-medium">${Number(expense.amount).toFixed(2)}</p>
+            <div className="text-right space-y-2">
+              <p className="font-medium">${Number(expense.amount).toFixed(2)}</p>
+              <form action={voidExpenseAction}>
+                <input type="hidden" name="expenseId" value={expense.id} />
+                <button className="text-sm rounded border px-3 py-1">Void</button>
+              </form>
+            </div>
           </div>
         ))}
       </div>

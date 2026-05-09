@@ -2,7 +2,7 @@ import { RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { inviteTenantAction } from '@/server/actions';
+import { deactivateTenantAction, inviteTenantAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,9 +28,15 @@ export default async function Page() {
         <section className="rounded-xl bg-white border shadow-sm divide-y">
           {tenants.length === 0 ? <p className="p-4 text-slate-600">No active tenants yet.</p> : null}
           {tenants.map((tenant) => (
-            <div key={tenant.id} className="p-4">
-              <p className="font-medium">{tenant.fullName}</p>
-              <p className="text-sm text-slate-600">{tenant.email}</p>
+            <div key={tenant.id} className="p-4 flex justify-between gap-4">
+              <div>
+                <p className="font-medium">{tenant.fullName}</p>
+                <p className="text-sm text-slate-600">{tenant.email}</p>
+              </div>
+              <form action={deactivateTenantAction}>
+                <input type="hidden" name="tenantId" value={tenant.id} />
+                <button className="text-sm rounded border px-3 py-1">Deactivate</button>
+              </form>
             </div>
           ))}
         </section>

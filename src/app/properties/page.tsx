@@ -2,7 +2,7 @@ import { RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { createPropertyAction } from '@/server/actions';
+import { archivePropertyAction, createPropertyAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +26,15 @@ export default async function Page() {
       <div className="rounded-xl bg-white border shadow-sm divide-y">
         {properties.length === 0 ? <p className="p-4 text-slate-600">No properties yet.</p> : null}
         {properties.map((property) => (
-          <div key={property.id} className="p-4">
-            <p className="font-medium">{property.name}</p>
-            <p className="text-sm text-slate-600">{property.address}, {property.city}, {property.state}</p>
+          <div key={property.id} className="p-4 flex justify-between gap-4">
+            <div>
+              <p className="font-medium">{property.name}</p>
+              <p className="text-sm text-slate-600">{property.address}, {property.city}, {property.state}</p>
+            </div>
+            <form action={archivePropertyAction}>
+              <input type="hidden" name="propertyId" value={property.id} />
+              <button className="text-sm rounded border px-3 py-1">Archive</button>
+            </form>
           </div>
         ))}
       </div>

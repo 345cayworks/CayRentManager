@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { LeaseStatus, PaymentStatus, RecordStatus, UserRole } from '@prisma/client';
+import { LeaseStatus, MaintenanceStatus, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { signIn, signOut } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { requireLandlordAccess, getCurrentLandlordWorkspace, requireSuperadmin } from '@/lib/auth/guards';
@@ -175,6 +175,157 @@ export async function recordExpenseAction(formData: FormData) {
   });
   await audit(user.userId, user.email, 'expense.recorded', 'Expense', expense.id, landlordId);
   revalidatePath('/expenses');
+  revalidatePath('/dashboard');
+}
+
+export async function disableUserAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const userId = text(formData, 'userId');
+  if (userId === actor.userId) throw new Error('You cannot disable your own account.');
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { status: UserStatus.DISABLED, disabledAt: new Date(), disabledBy: actor.userId },
+  });
+  await audit(actor.userId, actor.email, 'user.disabled', 'User', user.id, undefined, { targetEmail: user.email });
+  revalidatePath('/admin/users');
+}
+
+export async function reactivateUserAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const user = await prisma.user.update({
+    where: { id: text(formData, 'userId') },
+    data: { status: UserStatus.ACTIVE, disabledAt: null, disabledBy: null, disabledReason: null },
+  });
+  await audit(actor.userId, actor.email, 'user.reactivated', 'User', user.id, undefined, { targetEmail: user.email });
+  revalidatePath('/admin/users');
+}
+
+export async function archiveLandlordAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const landlord = await prisma.landlordProfile.update({
+    where: { id: text(formData, 'landlordId') },
+    data: { status: RecordStatus.ARCHIVED, archivedAt: new Date(), archivedBy: actor.userId },
+  });
+  await audit(actor.userId, actor.email, 'landlord.archived', 'LandlordProfile', landlord.id, landlord.id);
+  revalidatePath('/admin/landlords');
+}
+
+export async function reactivateLandlordAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const landlord = await prisma.landlordProfile.update({
+    where: { id: text(formData, 'landlordId') },
+    data: { status: RecordStatus.ACTIVE, archivedAt: null, archivedBy: null },
+  });
+  await audit(actor.userId, actor.email, 'landlord.reactivated', 'LandlordProfile', landlord.id, landlord.id);
+  revalidatePath('/admin/landlords');
+}
+
+export async function archivePropertyAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const property = await prisma.property.update({
+    where: { id: text(formData, 'propertyId'), landlordId },
+    data: { status: RecordStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'property.archived', 'Property', property.id, landlordId);
+  revalidatePath('/properties');
+  revalidatePath('/dashboard');
+}
+
+export async function archiveUnitAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const unit = await prisma.unit.update({
+    where: { id: text(formData, 'unitId'), landlordId },
+    data: { status: RecordStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'unit.archived', 'Unit', unit.id, landlordId);
+  revalidatePath('/units');
+  revalidatePath('/dashboard');
+}
+
+export async function deactivateTenantAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const tenant = await prisma.tenant.update({
+    where: { id: text(formData, 'tenantId'), landlordId },
+    data: { status: RecordStatus.INACTIVE, deactivatedAt: new Date(), deactivatedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'tenant.deactivated', 'Tenant', tenant.id, landlordId);
+  revalidatePath('/tenants');
+  revalidatePath('/dashboard');
+}
+
+export async function terminateLeaseAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const lease = await prisma.lease.update({
+    where: { id: text(formData, 'leaseId'), landlordId },
+    data: { status: LeaseStatus.TERMINATED, terminatedAt: new Date(), terminatedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'lease.terminated', 'Lease', lease.id, landlordId);
+  revalidatePath('/leases');
+  revalidatePath('/dashboard');
+}
+
+export async function expireLeaseAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const lease = await prisma.lease.update({
+    where: { id: text(formData, 'leaseId'), landlordId },
+    data: { status: LeaseStatus.EXPIRED },
+  });
+  await audit(user.userId, user.email, 'lease.expired', 'Lease', lease.id, landlordId);
+  revalidatePath('/leases');
+  revalidatePath('/dashboard');
+}
+
+export async function voidPaymentAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const payment = await prisma.payment.update({
+    where: { id: text(formData, 'paymentId'), landlordId },
+    data: { status: PaymentStatus.VOID, voidedAt: new Date(), voidedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'payment.voided', 'Payment', payment.id, landlordId);
+  revalidatePath('/payments');
+  revalidatePath('/dashboard');
+}
+
+export async function voidExpenseAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const expense = await prisma.expense.update({
+    where: { id: text(formData, 'expenseId'), landlordId },
+    data: { status: RecordStatus.VOID, voidedAt: new Date(), voidedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'expense.voided', 'Expense', expense.id, landlordId);
+  revalidatePath('/expenses');
+  revalidatePath('/dashboard');
+}
+
+export async function archiveDocumentAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const document = await prisma.document.update({
+    where: { id: text(formData, 'documentId'), landlordId },
+    data: { status: RecordStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'document.archived', 'Document', document.id, landlordId);
+  revalidatePath('/documents');
+}
+
+export async function closeMaintenanceAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const request = await prisma.maintenanceRequest.update({
+    where: { id: text(formData, 'maintenanceId'), landlordId },
+    data: { status: MaintenanceStatus.CLOSED },
+  });
+  await audit(user.userId, user.email, 'maintenance.closed', 'MaintenanceRequest', request.id, landlordId);
+  revalidatePath('/maintenance');
+  revalidatePath('/dashboard');
+}
+
+export async function archiveMaintenanceAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const request = await prisma.maintenanceRequest.update({
+    where: { id: text(formData, 'maintenanceId'), landlordId },
+    data: { status: MaintenanceStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
+  });
+  await audit(user.userId, user.email, 'maintenance.archived', 'MaintenanceRequest', request.id, landlordId);
+  revalidatePath('/maintenance');
   revalidatePath('/dashboard');
 }
 

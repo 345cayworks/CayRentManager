@@ -5,9 +5,15 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 
 const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
+if (!authSecret && process.env.NODE_ENV !== 'production') {
+  console.warn('Auth.js secret is missing. Set AUTH_SECRET and NEXTAUTH_SECRET for local auth testing.');
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
+  secret: authSecret,
   providers: googleConfigured
     ? [
         Google({

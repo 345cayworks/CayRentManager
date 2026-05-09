@@ -13,7 +13,7 @@ function identityPayload(user: any, fullName?: string) {
   };
 }
 
-export function IdentityAuthForm({ mode, redirectTo = '/dashboard' }: { mode: Mode; redirectTo?: string }) {
+export function IdentityAuthForm({ mode, redirectTo = '/unauthorized' }: { mode: Mode; redirectTo?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,12 +38,18 @@ export function IdentityAuthForm({ mode, redirectTo = '/dashboard' }: { mode: Mo
       body: JSON.stringify(identityPayload(user, fullName)),
     });
 
+    const body = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
       throw new Error(body.error ?? 'Unable to sync app session.');
     }
 
-    router.push(redirectTo);
+    const target = typeof body.redirectTo === 'string' ? body.redirectTo : redirectTo;
+
+    if (window.location.pathname !== target) {
+      router.replace(target);
+    }
+
     router.refresh();
   }
 

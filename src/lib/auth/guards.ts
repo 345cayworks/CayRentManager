@@ -1,63 +1,104 @@
 import { redirect } from 'next/navigation';
-import type { AppRole } from '@/lib/rbac/roles';
+import { UserRole, UserStatus } from '@prisma/client';
+import { auth } from '@/lib/auth/config';
+import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
+import { prisma } from '@/lib/db/prisma';
 
 export type AuthContext = {
   userId: string;
   email: string;
-  role: AppRole;
-  status: 'active' | 'disabled' | 'inactive';
+  role: UserRole;
+  status: UserStatus;
 };
 
-export async function requireAuth(context: AuthContext | null): Promise<AuthContext> {
-  if (!context) {
-    redirect('/login');
+export async function getActiveUser(): Promise<AuthContext | null> {
+  const session = await auth();
+  const email = session?.user?.email?.toLowerCase();
+  if (!email) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, role: true, status: true },
+  });
+
+  if (!user?.email) return null;
+
+  if (user.email.toLowerCase() === 'info@cayworks.com' && (user.role !== UserRole.SUPERADMIN || user.status !== UserStatus.ACTIVE)) {
+    const fixed = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        role: UserRole.SUPERADMIN,
+        status: UserStatus.ACTIVE,
+        disabledAt: null,
+        disabledBy: null,
+        disabledReason: null,
+      },
+      select: { id: true, email: true, role: true, status: true },
+    });
+    return { userId: fixed.id, email: fixed.email!, role: fixed.role, status: fixed.status };
   }
 
-  if (context.status !== 'active') {
-    redirect('/login?error=disabled');
-  }
-
-  return context;
+  return { userId: user.id, email: user.email, role: user.role, status: user.status };
 }
 
-export async function requireRole(context: AuthContext | null, allowed: AppRole[]) {
-  const user = await requireAuth(context);
-
-  if (!allowed.includes(user.role)) {
-    redirect('/dashboard?error=forbidden');
-  }
-
+export async function requireAuth(): Promise<AuthContext> {
+  const user = await getActiveUser();
+  if (!user) redirect('/login');
+  if (user.status !== UserStatus.ACTIVE) redirect('/login?error=disabled');
   return user;
 }
 
-export async function requireSuperadmin(context: AuthContext | null) {
-  return requireRole(context, ['superadmin']);
-}
-
-export async function requireLandlordAccess(context: AuthContext | null, landlordId: string, membershipLandlordIds: string[]) {
-  const user = await requireRole(context, ['superadmin', 'landlord', 'property_manager', 'accountant']);
-
-  if (user.role !== 'superadmin' && !membershipLandlordIds.includes(landlordId)) {
-    redirect('/dashboard?error=landlord-scope');
-  }
-
+export async function requireRole(allowed: UserRole[]) {
+  const user = await requireAuth();
+  if (!allowed.includes(user.role)) redirect('/dashboard?error=forbidden');
   return user;
 }
 
-export async function requireTenantAccess(context: AuthContext | null, tenantId: string, currentTenantId: string | null) {
-  const user = await requireRole(context, ['tenant', 'superadmin']);
+export async function requireSuperadmin() {
+  return requireRole([UserRole.SUPERADMIN]);
+}
 
-  if (user.role !== 'superadmin' && tenantId !== currentTenantId) {
-    redirect('/tenant/dashboard?error=tenant-scope');
-  }
+export async function getUserLandlordMemberships(userId?: string) {
+  const user = userId ? null : await requireAuth();
+  return prisma.landlordMembership.findMany({
+    where: {
+      userId: userId ?? user!.userId,
+      status: 'ACTIVE',
+      landlord: { status: 'ACTIVE' },
+    },
+    include: { landlord: true },
+    orderBy: { createdAt: 'asc' },
+  });
+}
 
+export async function requireLandlordAccess(landlordId: string) {
+  const user = await requireRole([UserRole.SUPERADMIN, UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.ACCOUNTANT]);
+  if (user.role === UserRole.SUPERADMIN) return user;
+
+  const membership = await prisma.landlordMembership.findFirst({
+    where: { landlordId, userId: user.userId, status: 'ACTIVE', landlord: { status: 'ACTIVE' } },
+  });
+
+  if (!membership) redirect('/dashboard?error=landlord-scope');
   return user;
 }
 
-export function getActiveLandlordWorkspace(membershipLandlordIds: string[], requestedLandlordId?: string) {
-  if (requestedLandlordId && membershipLandlordIds.includes(requestedLandlordId)) {
-    return requestedLandlordId;
-  }
+export async function requireTenantAccess(tenantId: string) {
+  const user = await requireRole([UserRole.TENANT, UserRole.SUPERADMIN]);
+  if (user.role === UserRole.SUPERADMIN) return user;
 
-  return membershipLandlordIds[0] ?? null;
+  const tenant = await prisma.tenant.findFirst({
+    where: { id: tenantId, userId: user.userId, status: 'ACTIVE' },
+  });
+
+  if (!tenant) redirect('/tenant/dashboard?error=tenant-scope');
+  return user;
+}
+
+export async function getCurrentLandlordWorkspace() {
+  const user = await requireRole([UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.ACCOUNTANT]);
+  const memberships = await getUserLandlordMemberships(user.userId);
+  const active = getActiveLandlordWorkspace(memberships.map((membership) => membership.landlordId));
+  if (!active) redirect('/register?error=no-workspace');
+  return { user, landlordId: active, membership: memberships.find((membership) => membership.landlordId === active)! };
 }

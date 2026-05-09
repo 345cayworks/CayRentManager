@@ -1,4 +1,4 @@
-import { AppRole, RecordStatus } from '@prisma/client';
+import { RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 
 type RegisterLandlordInput = {
@@ -9,14 +9,15 @@ type RegisterLandlordInput = {
 };
 
 export async function registerPublicLandlord(input: RegisterLandlordInput) {
-  const user = await prisma.appUser.upsert({
+  const user = await prisma.user.upsert({
     where: { email: input.email.toLowerCase() },
-    update: { fullName: input.fullName },
+    update: { fullName: input.fullName, name: input.fullName },
     create: {
       email: input.email.toLowerCase(),
+      name: input.fullName,
       fullName: input.fullName,
-      role: AppRole.landlord,
-      status: RecordStatus.active,
+      role: UserRole.LANDLORD,
+      status: UserStatus.ACTIVE,
     },
   });
 
@@ -25,9 +26,9 @@ export async function registerPublicLandlord(input: RegisterLandlordInput) {
       ownerUserId: user.id,
       companyName: input.companyName,
       displayName: input.displayName,
-      status: RecordStatus.active,
+      status: RecordStatus.ACTIVE,
       memberships: {
-        create: { userId: user.id, role: AppRole.landlord, status: RecordStatus.active },
+        create: { userId: user.id, role: UserRole.LANDLORD, status: RecordStatus.ACTIVE },
       },
     },
   });

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { AppRole, RecordStatus } from '@prisma/client';
+import { InvitationStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 
 export async function createTenantInvitation(landlordId: string, email: string, propertyId?: string, unitId?: string) {
@@ -10,7 +10,7 @@ export async function createTenantInvitation(landlordId: string, email: string, 
       propertyId,
       unitId,
       inviteToken: crypto.randomUUID(),
-      status: RecordStatus.pending,
+      status: InvitationStatus.PENDING,
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
     },
   });
@@ -20,18 +20,19 @@ export async function acceptTenantInvitation(token: string, authEmail: string, f
   const invitation = await prisma.tenantInvitation.findUnique({ where: { inviteToken: token } });
 
   if (!invitation) throw new Error('Invite not found');
-  if (invitation.status !== RecordStatus.pending) throw new Error('Invite is not pending');
+  if (invitation.status !== InvitationStatus.PENDING) throw new Error('Invite is not pending');
   if (invitation.expiresAt < new Date()) throw new Error('Invite expired');
   if (invitation.email.toLowerCase() !== authEmail.toLowerCase()) throw new Error('Email mismatch');
 
-  const user = await prisma.appUser.upsert({
+  const user = await prisma.user.upsert({
     where: { email: authEmail.toLowerCase() },
-    update: { fullName, role: AppRole.tenant, status: RecordStatus.active },
+    update: { fullName, name: fullName, role: UserRole.TENANT, status: UserStatus.ACTIVE },
     create: {
       email: authEmail.toLowerCase(),
+      name: fullName,
       fullName,
-      role: AppRole.tenant,
-      status: RecordStatus.active,
+      role: UserRole.TENANT,
+      status: UserStatus.ACTIVE,
     },
   });
 
@@ -41,13 +42,13 @@ export async function acceptTenantInvitation(token: string, authEmail: string, f
       userId: user.id,
       fullName,
       email: authEmail.toLowerCase(),
-      status: RecordStatus.active,
+      status: RecordStatus.ACTIVE,
     },
   });
 
   await prisma.tenantInvitation.update({
     where: { id: invitation.id },
-    data: { status: RecordStatus.active, acceptedAt: new Date() },
+    data: { status: InvitationStatus.ACCEPTED, acceptedAt: new Date() },
   });
 
   return { user, tenant };

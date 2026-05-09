@@ -1,2 +1,2 @@
-export const ROLES = ['superadmin', 'landlord', 'property_manager', 'accountant', 'tenant'] as const;
+export const ROLES = ['SUPERADMIN', 'LANDLORD', 'PROPERTY_MANAGER', 'ACCOUNTANT', 'TENANT'] as const;
 export type AppRole = (typeof ROLES)[number];

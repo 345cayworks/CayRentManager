@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getActiveLandlordWorkspace } from '@/lib/auth/guards';
+import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
 
 describe('landlord and tenant isolation helpers', () => {
   it('keeps user pinned to valid landlord workspace', () => {

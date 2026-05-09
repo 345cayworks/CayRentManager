@@ -5,8 +5,11 @@ const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefi
 
 function getDatasourceUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  if (process.env.NETLIFY) return getConnectionString();
-  return undefined;
+  try {
+    return getConnectionString();
+  } catch {
+    return undefined;
+  }
 }
 
 const datasourceUrl = getDatasourceUrl();

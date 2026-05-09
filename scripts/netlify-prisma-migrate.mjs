@@ -12,9 +12,13 @@ if (existsSync(migrationPath)) {
 
 let databaseUrl = process.env.DATABASE_URL || '';
 
-if (!databaseUrl && process.env.NETLIFY) {
-  console.log('DATABASE_URL is not set; using Netlify Database connection string fallback.');
-  databaseUrl = getConnectionString();
+if (!databaseUrl) {
+  try {
+    console.log('DATABASE_URL is not set; using Netlify Database connection string fallback.');
+    databaseUrl = getConnectionString();
+  } catch {
+    databaseUrl = '';
+  }
 } else if (databaseUrl) {
   console.log('Using DATABASE_URL for Prisma migrations.');
 }

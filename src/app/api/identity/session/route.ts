@@ -1,8 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getUser as getNetlifyIdentityUser } from '@netlify/identity';
-import { UserStatus } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 import { createAppSession } from '@/lib/auth/session';
 import { syncIdentityUser } from '@/lib/identity/sync';
+
+function getRedirectPath(role: UserRole | string, status: UserStatus | string) {
+  if (status === UserStatus.DISABLED || status === 'DISABLED') {
+    return '/login?error=disabled';
+  }
+
+  switch (role) {
+    case UserRole.SUPERADMIN:
+    case 'SUPERADMIN':
+      return '/admin';
+    case UserRole.TENANT:
+    case 'TENANT':
+      return '/tenant/dashboard';
+    case UserRole.LANDLORD:
+    case UserRole.PROPERTY_MANAGER:
+    case UserRole.ACCOUNTANT:
+    case 'LANDLORD':
+    case 'PROPERTY_MANAGER':
+    case 'ACCOUNTANT':
+      return '/dashboard';
+    default:
+      return '/unauthorized';
+  }
+}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -16,13 +40,29 @@ export async function POST(request: Request) {
   }
 
   const { user, createdWorkspace } = await syncIdentityUser({ netlifyUserId, email, fullName });
+
   if (user.status === UserStatus.DISABLED) {
-    return NextResponse.json({ error: 'Account disabled.' }, { status: 403 });
+    return NextResponse.json(
+      {
+        error: 'Account disabled.',
+        redirectTo: '/login?error=disabled',
+      },
+      { status: 403 },
+    );
   }
 
   await createAppSession(user.id);
+
+  const appUser = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+  };
+
   return NextResponse.json({
-    user: { id: user.id, email: user.email, role: user.role, status: user.status },
+    user: appUser,
     createdWorkspace,
+    redirectTo: getRedirectPath(appUser.role, appUser.status),
   });
 }

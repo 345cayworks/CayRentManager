@@ -61,10 +61,7 @@ export async function GET() {
       expectedTables: Object.fromEntries(expectedTables.map((table) => [table, tables.includes(table)])),
     },
     auth: {
-      hasAuthSecret: Boolean(process.env.AUTH_SECRET),
-      hasNextAuthSecret: Boolean(process.env.NEXTAUTH_SECRET),
-      hasGoogleClientId: Boolean(process.env.GOOGLE_CLIENT_ID),
-      hasGoogleClientSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+      hasAppSessionSecret: Boolean(process.env.APP_SESSION_SECRET),
     },
   });
 }

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { UserRole, UserStatus } from '@prisma/client';
-import { auth } from '@/lib/auth/config';
+import { getAppSessionUser } from '@/lib/auth/session';
 import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
 import { prisma } from '@/lib/db/prisma';
 
@@ -12,15 +12,7 @@ export type AuthContext = {
 };
 
 export async function getActiveUser(): Promise<AuthContext | null> {
-  const session = await auth();
-  const email = session?.user?.email?.toLowerCase();
-  if (!email) return null;
-
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, email: true, role: true, status: true },
-  });
-
+  const user = await getAppSessionUser();
   if (!user?.email) return null;
 
   if (user.email.toLowerCase() === 'info@cayworks.com' && (user.role !== UserRole.SUPERADMIN || user.status !== UserStatus.ACTIVE)) {
@@ -31,11 +23,12 @@ export async function getActiveUser(): Promise<AuthContext | null> {
         status: UserStatus.ACTIVE,
         disabledAt: null,
         disabledBy: null,
+        disabledById: null,
         disabledReason: null,
       },
       select: { id: true, email: true, role: true, status: true },
     });
-    return { userId: fixed.id, email: fixed.email!, role: fixed.role, status: fixed.status };
+    return { userId: fixed.id, email: fixed.email, role: fixed.role, status: fixed.status };
   }
 
   return { userId: user.id, email: user.email, role: user.role, status: user.status };

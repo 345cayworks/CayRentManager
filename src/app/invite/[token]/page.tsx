@@ -1,7 +1,7 @@
 import { InvitationStatus } from '@prisma/client';
 import { notFound } from 'next/navigation';
+import { TenantInviteAuthForm } from '@/components/tenant-invite-auth-form';
 import { prisma } from '@/lib/db/prisma';
-import { acceptTenantInviteAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,11 +23,7 @@ export default async function InviteTokenPage({ params }: { params: { token: str
         {disabled ? (
           <p className="mt-6 text-red-700">This invitation is no longer active.</p>
         ) : (
-          <form action={acceptTenantInviteAction.bind(null, params.token)} className="mt-6 grid gap-3">
-            <input required name="fullName" placeholder="Full name" className="border rounded px-3 py-2" />
-            <input required name="email" type="email" placeholder={invitation.email} className="border rounded px-3 py-2" />
-            <button className="rounded bg-brand-navy text-white px-4 py-2">Accept invite</button>
-          </form>
+          <TenantInviteAuthForm token={params.token} invitedEmail={invitation.email} />
         )}
       </div>
     </main>

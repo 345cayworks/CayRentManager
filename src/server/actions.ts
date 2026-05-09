@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { LeaseStatus, MaintenanceStatus, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
-import { signIn, signOut } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { requireLandlordAccess, getCurrentLandlordWorkspace, requireSuperadmin } from '@/lib/auth/guards';
 import { registerPublicLandlord } from '@/lib/services/registration';
@@ -182,9 +181,14 @@ export async function disableUserAction(formData: FormData) {
   const actor = await requireSuperadmin();
   const userId = text(formData, 'userId');
   if (userId === actor.userId) throw new Error('You cannot disable your own account.');
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, status: true } });
+  if (target?.role === UserRole.SUPERADMIN && target.status === UserStatus.ACTIVE) {
+    const activeSuperadmins = await prisma.user.count({ where: { role: UserRole.SUPERADMIN, status: UserStatus.ACTIVE } });
+    if (activeSuperadmins <= 1) throw new Error('You cannot disable the only active superadmin.');
+  }
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { status: UserStatus.DISABLED, disabledAt: new Date(), disabledBy: actor.userId },
+    data: { status: UserStatus.DISABLED, disabledAt: new Date(), disabledBy: actor.email, disabledById: actor.userId },
   });
   await audit(actor.userId, actor.email, 'user.disabled', 'User', user.id, undefined, { targetEmail: user.email });
   revalidatePath('/admin/users');
@@ -197,6 +201,21 @@ export async function reactivateUserAction(formData: FormData) {
     data: { status: UserStatus.ACTIVE, disabledAt: null, disabledBy: null, disabledReason: null },
   });
   await audit(actor.userId, actor.email, 'user.reactivated', 'User', user.id, undefined, { targetEmail: user.email });
+  revalidatePath('/admin/users');
+}
+
+export async function assignUserRoleAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const userId = text(formData, 'userId');
+  const role = text(formData, 'role') as UserRole;
+  if (!Object.values(UserRole).includes(role)) throw new Error('Invalid role.');
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { role },
+  });
+
+  await audit(actor.userId, actor.email, 'user.role_assigned', 'User', user.id, undefined, { targetEmail: user.email, role });
   revalidatePath('/admin/users');
 }
 
@@ -331,16 +350,4 @@ export async function archiveMaintenanceAction(formData: FormData) {
 
 export async function ensureSuperadminAction() {
   await requireSuperadmin();
-}
-
-export async function signInWithGoogleAction() {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    redirect('/login?error=google-not-configured');
-  }
-
-  await signIn('google', { redirectTo: '/dashboard' });
-}
-
-export async function signOutAction() {
-  await signOut({ redirectTo: '/' });
 }

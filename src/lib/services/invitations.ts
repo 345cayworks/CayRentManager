@@ -16,7 +16,7 @@ export async function createTenantInvitation(landlordId: string, email: string, 
   });
 }
 
-export async function acceptTenantInvitation(token: string, authEmail: string, fullName: string) {
+export async function acceptTenantInvitation(token: string, authEmail: string, fullName: string, netlifyUserId?: string) {
   const invitation = await prisma.tenantInvitation.findUnique({ where: { inviteToken: token } });
 
   if (!invitation) throw new Error('Invite not found');
@@ -24,15 +24,28 @@ export async function acceptTenantInvitation(token: string, authEmail: string, f
   if (invitation.expiresAt < new Date()) throw new Error('Invite expired');
   if (invitation.email.toLowerCase() !== authEmail.toLowerCase()) throw new Error('Email mismatch');
 
-  const user = await prisma.user.upsert({
-    where: { email: authEmail.toLowerCase() },
-    update: { fullName, name: fullName, role: UserRole.TENANT, status: UserStatus.ACTIVE },
-    create: {
+  const existing = await prisma.user.findUnique({ where: { email: authEmail.toLowerCase() } });
+  const user = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          netlifyUserId: netlifyUserId ?? existing.netlifyUserId,
+          fullName,
+          name: fullName,
+          role: UserRole.TENANT,
+          status: existing.status === UserStatus.DISABLED ? UserStatus.DISABLED : UserStatus.ACTIVE,
+          lastLoginAt: new Date(),
+        },
+      })
+    : await prisma.user.create({
+      data: {
+      netlifyUserId,
       email: authEmail.toLowerCase(),
       name: fullName,
       fullName,
       role: UserRole.TENANT,
       status: UserStatus.ACTIVE,
+      lastLoginAt: new Date(),
     },
   });
 

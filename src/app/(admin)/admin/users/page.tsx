@@ -1,7 +1,8 @@
 import { Shell } from '@/components/shell';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { disableUserAction, reactivateUserAction } from '@/server/actions';
+import { assignUserRoleAction, disableUserAction, reactivateUserAction } from '@/server/actions';
+import { UserRole } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,13 @@ export default async function Page() {
             </div>
             <div className="text-right space-y-2">
               <p className="text-sm">{user.role} / {user.status}</p>
+              <form action={assignUserRoleAction} className="flex gap-2 justify-end">
+                <input type="hidden" name="userId" value={user.id} />
+                <select name="role" defaultValue={user.role} className="text-sm rounded border px-2 py-1">
+                  {Object.values(UserRole).map((role) => <option key={role} value={role}>{role}</option>)}
+                </select>
+                <button className="text-sm rounded border px-3 py-1">Save</button>
+              </form>
               <form action={user.status === 'DISABLED' ? reactivateUserAction : disableUserAction}>
                 <input type="hidden" name="userId" value={user.id} />
                 <button className="text-sm rounded border px-3 py-1">{user.status === 'DISABLED' ? 'Reactivate' : 'Disable'}</button>

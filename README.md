@@ -1,12 +1,12 @@
 # CayRentManager
 
-Next.js production rewrite for CayRentManager, built with App Router, Prisma, PostgreSQL, and Auth.js.
+Next.js production rewrite for CayRentManager, built with App Router, Prisma, PostgreSQL, Netlify Database, and Netlify Identity.
 
 ## Rescue status
 
 Classification: **B. Mostly placeholder shell, but salvageable.**
 
-The repo now has a real database foundation, Auth.js direction, server-side authorization helpers, seed data, and database-backed MVP pages for the first landlord workflow. Some secondary pages remain thin and need the next build phase before full production launch.
+The repo now has a real database foundation, Netlify Identity login and app-user sync, server-side authorization helpers, seed data, and database-backed MVP pages for the first landlord workflow. Some secondary pages remain thin and need the next build phase before full production launch.
 
 ## Setup
 
@@ -28,22 +28,22 @@ npm run dev
 ## Required Netlify environment variables
 
 - `DATABASE_URL`
-- `NEXTAUTH_SECRET`
-- `AUTH_SECRET`
+- `APP_SESSION_SECRET`
 - `NEXT_PUBLIC_APP_URL`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
 
 Only `NEXT_PUBLIC_APP_URL` is public. Do not prefix secrets with `NEXT_PUBLIC_`.
 
+Use a long random value for `APP_SESSION_SECRET`. Enable Netlify Identity in the Netlify UI for the `cayrentmanager` site and keep public registration enabled while landlord self-signup is open.
+
 ## Auth model
 
-This rewrite uses **Auth.js with Prisma Adapter**. Netlify Identity is not mixed into the auth path.
+This rewrite uses **Netlify Identity** for authentication and Prisma for app roles, workspaces, tenant records, payments, expenses, leases, audit logs, and dashboards.
 
-- Google login is configured through Auth.js.
+- Login, registration, logout, and password recovery are handled by Netlify Identity.
+- After Identity login, the app syncs the Identity user to a Prisma `User` and creates a signed app session cookie.
 - App database roles and statuses are the source of truth.
 - `info@cayworks.com` is bootstrapped server-side as `SUPERADMIN` and `ACTIVE`.
-- Disabled users are blocked during sign-in and by server guards.
+- Disabled users are blocked by the app session bridge and server guards.
 - Public registration creates `LANDLORD` users and workspaces only.
 - Tenant onboarding requires `/invite/[token]`.
 
@@ -85,7 +85,7 @@ The seed script creates:
 - Landlord A and Landlord B
 - Separate properties, units, tenants, leases, payments, and expenses
 
-Demo passwords are not committed. Use Google login or create local Auth.js sessions through the configured provider path.
+Demo passwords are not committed. Use Netlify Identity accounts for login, and seed data only for app records and isolation checks.
 
 ## Manual QA checklist
 

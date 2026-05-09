@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getIdentityErrorMessage } from '@/lib/netlify/identity-errors';
 import { getCurrentIdentityUser, initializeIdentity, login, logout, signup } from '@/lib/netlify/identity-client';
 
 type Mode = 'login' | 'signup';
@@ -55,7 +56,7 @@ export function IdentityAuthForm({ mode, redirectTo = '/dashboard' }: { mode: Mo
       const user = mode === 'signup' ? await signup(email, password, fullName) : await login(email, password);
       await syncSession(user);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Authentication failed.');
+      setMessage(getIdentityErrorMessage(error));
     } finally {
       setBusy(false);
     }

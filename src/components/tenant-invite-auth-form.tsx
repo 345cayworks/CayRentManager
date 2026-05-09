@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getIdentityErrorMessage } from '@/lib/netlify/identity-errors';
 import { getCurrentIdentityUser, initializeIdentity, login, signup } from '@/lib/netlify/identity-client';
 
 function identityPayload(user: any, fullName: string, token: string) {
@@ -48,7 +49,7 @@ export function TenantInviteAuthForm({ token, invitedEmail }: { token: string; i
       const user = current ?? (mode === 'signup' ? await signup(email, password, fullName) : await login(email, password));
       await accept(user);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Invite acceptance failed.');
+      setMessage(getIdentityErrorMessage(error, 'Invite acceptance failed.'));
     } finally {
       setBusy(false);
     }

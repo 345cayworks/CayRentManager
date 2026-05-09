@@ -43,6 +43,7 @@ This rewrite uses **Netlify Identity** for authentication and Prisma for app rol
 - After Identity login, the app syncs the Identity user to a Prisma `User` and creates a signed app session cookie.
 - App database roles and statuses are the source of truth.
 - `info@cayworks.com` is bootstrapped server-side as `SUPERADMIN` and `ACTIVE`.
+- The primary Superadmin email `info@cayworks.com` must be confirmed in Netlify Identity before it can bootstrap as `SUPERADMIN` in the app.
 - Disabled users are blocked by the app session bridge and server guards.
 - Public registration creates `LANDLORD` users and workspaces only.
 - Tenant onboarding requires `/invite/[token]`.

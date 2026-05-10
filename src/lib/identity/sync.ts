@@ -1,6 +1,8 @@
 import { RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 
+export const PRIMARY_SUPERADMIN_EMAIL = 'info@cayworks.com';
+
 export type IdentitySyncInput = {
   netlifyUserId: string;
   email: string;
@@ -17,20 +19,71 @@ async function writeAudit(actorUserId: string, actorEmail: string, action: strin
   });
 }
 
+export async function bootstrapPrimaryOwner(input: IdentitySyncInput, action = 'owner_bootstrapped') {
+  const email = normalizeEmail(input.email);
+  if (email !== PRIMARY_SUPERADMIN_EMAIL) throw new Error('Only the primary platform owner can be bootstrapped.');
+  if (!input.netlifyUserId) throw new Error('Netlify Identity id is required.');
+
+  const fullName = input.fullName?.trim() || 'Platform Owner';
+  const existing = await prisma.user.findFirst({
+    where: { OR: [{ email }, { netlifyUserId: input.netlifyUserId }] },
+    include: { memberships: true },
+  });
+
+  const user = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          netlifyUserId: input.netlifyUserId,
+          email,
+          name: existing.name ?? fullName,
+          fullName: existing.fullName ?? fullName,
+          role: UserRole.SUPERADMIN,
+          status: UserStatus.ACTIVE,
+          lastLoginAt: new Date(),
+          disabledAt: null,
+          disabledBy: null,
+          disabledById: null,
+          disabledReason: null,
+        },
+        include: { memberships: true },
+      })
+    : await prisma.user.create({
+        data: {
+          netlifyUserId: input.netlifyUserId,
+          email,
+          name: fullName,
+          fullName,
+          role: UserRole.SUPERADMIN,
+          status: UserStatus.ACTIVE,
+          lastLoginAt: new Date(),
+        },
+        include: { memberships: true },
+      });
+
+  await writeAudit(user.id, user.email, action, 'User', user.id);
+  return user;
+}
+
 export async function syncIdentityUser(input: IdentitySyncInput) {
   const email = normalizeEmail(input.email);
   if (!input.netlifyUserId || !email) throw new Error('Netlify Identity id and email are required.');
 
   const fullName = input.fullName?.trim() || email;
-  const isPrimarySuperadmin = email === 'info@cayworks.com';
+  const isPrimarySuperadmin = email === PRIMARY_SUPERADMIN_EMAIL;
+
+  if (isPrimarySuperadmin) {
+    const user = await bootstrapPrimaryOwner({ ...input, fullName }, 'superadmin_bootstrapped');
+    await writeAudit(user.id, user.email, 'identity_user_synced', 'User', user.id);
+    return { user, createdWorkspace: false };
+  }
+
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email }, { netlifyUserId: input.netlifyUserId }] },
     include: { memberships: true },
   });
 
   if (existing) {
-    const role = isPrimarySuperadmin ? UserRole.SUPERADMIN : existing.role;
-    const status = isPrimarySuperadmin ? UserStatus.ACTIVE : existing.status;
     const user = await prisma.user.update({
       where: { id: existing.id },
       data: {
@@ -38,34 +91,14 @@ export async function syncIdentityUser(input: IdentitySyncInput) {
         email,
         name: existing.name ?? fullName,
         fullName: existing.fullName ?? fullName,
-        role,
-        status,
+        role: existing.role,
+        status: existing.status,
         lastLoginAt: new Date(),
-        ...(isPrimarySuperadmin ? { disabledAt: null, disabledBy: null, disabledById: null, disabledReason: null } : {}),
       },
       include: { memberships: true },
     });
 
     await writeAudit(user.id, user.email, 'identity_user_synced', 'User', user.id);
-    if (isPrimarySuperadmin) await writeAudit(user.id, user.email, 'superadmin_bootstrapped', 'User', user.id);
-    return { user, createdWorkspace: false };
-  }
-
-  if (isPrimarySuperadmin) {
-    const user = await prisma.user.create({
-      data: {
-        netlifyUserId: input.netlifyUserId,
-        email,
-        name: fullName,
-        fullName,
-        role: UserRole.SUPERADMIN,
-        status: UserStatus.ACTIVE,
-        lastLoginAt: new Date(),
-      },
-      include: { memberships: true },
-    });
-    await writeAudit(user.id, user.email, 'identity_user_synced', 'User', user.id);
-    await writeAudit(user.id, user.email, 'superadmin_bootstrapped', 'User', user.id);
     return { user, createdWorkspace: false };
   }
 

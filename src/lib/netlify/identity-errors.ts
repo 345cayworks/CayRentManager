@@ -1,5 +1,5 @@
 const UNCONFIRMED_EMAIL_MESSAGE =
-  'Your email address has not been confirmed yet. Please check your inbox and click the confirmation link, or ask an administrator to resend your confirmation email.';
+  'Your Netlify Identity account exists but the email has not been confirmed. For the platform owner account, confirm the user in Netlify Identity Admin or disable mandatory confirmation during MVP testing.';
 
 export function getIdentityErrorMessage(error: unknown, fallback = 'Authentication failed.') {
   const message = error instanceof Error ? error.message : String(error ?? '');

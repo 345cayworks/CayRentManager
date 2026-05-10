@@ -76,6 +76,27 @@ export default async function Page({ params }: { params: { id: string } }) {
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="space-y-4">
             <section className="rounded-xl bg-white border shadow-sm p-4">
+              <h3 className="font-semibold">Financial summary</h3>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-slate-500">Monthly rent expected</p>
+                  <p className="text-xl font-semibold">${monthlyRentExpected.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Monthly rent collected</p>
+                  <p className="text-xl font-semibold">${monthlyRentCollected.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Monthly expenses</p>
+                  <p className="text-xl font-semibold">${monthlyExpenses.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Net cashflow</p>
+                  <p className="text-xl font-semibold">${(monthlyRentCollected - monthlyExpenses).toFixed(2)}</p>
+                </div>
+              </div>
+            </section>
+            <section className="rounded-xl bg-white border shadow-sm p-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold">Units</h3>
                 <Link className="text-brand-navy text-sm" href="/units">Add unit</Link>

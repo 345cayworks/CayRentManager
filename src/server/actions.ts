@@ -156,6 +156,55 @@ export async function recordPaymentAction(formData: FormData) {
   revalidatePath('/dashboard');
 }
 
+export async function exportPaymentsCsvAction() {
+  const { landlordId } = await getCurrentLandlordWorkspace();
+  const payments = await prisma.payment.findMany({
+    where: { landlordId, status: { not: PaymentStatus.VOID } },
+    include: { tenant: true, unit: { include: { property: true } }, lease: true },
+    orderBy: { dueDate: 'desc' },
+  });
+
+  const csvHeaders = [
+    'Due Date',
+    'Payment Date',
+    'Tenant',
+    'Property',
+    'Unit',
+    'Amount Due',
+    'Amount Paid',
+    'Balance',
+    'Status',
+    'Payment Method',
+    'Notes'
+  ];
+
+  const csvRows = payments.map(payment => [
+    payment.dueDate.toISOString().split('T')[0],
+    payment.paymentDate?.toISOString().split('T')[0] ?? '',
+    `"${payment.tenant.fullName}"`,
+    `"${payment.unit.property.name}"`,
+    `"${payment.unit.unitName}"`,
+    payment.amountDue.toString(),
+    (payment.amountPaid ?? 0).toString(),
+    payment.balance.toString(),
+    payment.status,
+    `"${payment.paymentMethod ?? ''}"`,
+    `"${payment.notes ?? ''}"`
+  ]);
+
+  const csvContent = [csvHeaders, ...csvRows].map(row => row.join(',')).join('\n');
+
+  // Return CSV as response
+  const response = new Response(csvContent, {
+    headers: {
+      'Content-Type': 'text/csv',
+      'Content-Disposition': 'attachment; filename="payments.csv"'
+    }
+  });
+
+  return response;
+}
+
 export async function recordExpenseAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
   const propertyId = text(formData, 'propertyId');

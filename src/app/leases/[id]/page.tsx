@@ -86,18 +86,54 @@ export default async function Page({ params }: { params: { id: string } }) {
           </section>
 
           <section className="rounded-xl bg-white border shadow-sm p-4">
+            <h3 className="font-semibold">Balance summary</h3>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-slate-500">Outstanding balance</p>
+                <p className="text-xl font-semibold">${outstandingBalance.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Total paid</p>
+                <p className="text-xl font-semibold">${lease.payments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0).toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Total due</p>
+                <p className="text-xl font-semibold">${lease.payments.reduce((sum, p) => sum + Number(p.amountDue), 0).toFixed(2)}</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-xl bg-white border shadow-sm p-4">
             <h3 className="font-semibold">Payment history</h3>
             {lease.payments.length === 0 ? (
               <p className="text-slate-600 mt-4">No payments recorded for this lease.</p>
             ) : (
-              <ul className="mt-3 space-y-2">
-                {lease.payments.map((payment) => (
-                  <li key={payment.id} className="flex justify-between">
-                    <span>{payment.dueDate.toLocaleDateString()}</span>
-                    <span>${Number(payment.amountPaid ?? 0).toFixed(2)}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left p-2">Due Date</th>
+                      <th className="text-left p-2">Payment Date</th>
+                      <th className="text-right p-2">Amount Due</th>
+                      <th className="text-right p-2">Amount Paid</th>
+                      <th className="text-right p-2">Balance</th>
+                      <th className="text-left p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {lease.payments.map((payment) => (
+                      <tr key={payment.id}>
+                        <td className="p-2">{payment.dueDate.toLocaleDateString()}</td>
+                        <td className="p-2">{payment.paymentDate?.toLocaleDateString() ?? '—'}</td>
+                        <td className="p-2 text-right">${Number(payment.amountDue).toFixed(2)}</td>
+                        <td className="p-2 text-right">${Number(payment.amountPaid ?? 0).toFixed(2)}</td>
+                        <td className="p-2 text-right">${Number(payment.balance).toFixed(2)}</td>
+                        <td className="p-2">{payment.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
 

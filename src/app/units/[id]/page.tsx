@@ -76,18 +76,21 @@ export default async function Page({ params }: { params: { id: string } }) {
           </section>
 
           <section className="rounded-xl bg-white border shadow-sm p-4">
-            <h3 className="font-semibold">Current active lease</h3>
-            {!activeLease ? (
-              <p className="text-slate-600 mt-4">No active lease for this unit.</p>
-            ) : (
-              <div className="mt-4 space-y-2">
-                <Link className="text-brand-navy" href={`/leases/${activeLease.id}`}>
-                  Lease {activeLease.id}
-                </Link>
-                <p>{activeLease.tenant.fullName}</p>
-                <p>{activeLease.startDate.toLocaleDateString()} — {activeLease.endDate.toLocaleDateString()}</p>
+            <h3 className="font-semibold">Balance summary</h3>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-slate-500">Outstanding balance</p>
+                <p className="text-xl font-semibold">${outstandingBalance.toFixed(2)}</p>
               </div>
-            )}
+              <div>
+                <p className="text-slate-500">Total paid</p>
+                <p className="text-xl font-semibold">${unit.payments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0).toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Total due</p>
+                <p className="text-xl font-semibold">${unit.payments.reduce((sum, p) => sum + Number(p.amountDue), 0).toFixed(2)}</p>
+              </div>
+            </div>
           </section>
 
           <section className="rounded-xl bg-white border shadow-sm p-4">

@@ -118,6 +118,30 @@ This is for emergency repair only. It should not be used as the normal login sys
 
 Normal login remains through Netlify Identity.
 
+Emergency repair endpoint:
+
+```text
+POST /api/admin/bootstrap-owner
+```
+
+Request body:
+
+```json
+{
+  "masterKey": "..."
+}
+```
+
+Rules:
+
+- `SUPER_ADMIN_EMAIL` is the only email that can be promoted.
+- `SUPERADMIN_MASTER_KEY` must match the submitted `masterKey`.
+- The endpoint must not support `GET`.
+- The client must not choose the email or role.
+- The master key must never be committed, logged, printed, stored in the database, returned in JSON, or exposed with `NEXT_PUBLIC_`.
+- The response must only include safe fields such as `ok`, `email`, `role`, and `status`.
+- Owner may disable or remove this endpoint after confirming Superadmin access.
+
 ---
 
 ## 4. Primary Roles

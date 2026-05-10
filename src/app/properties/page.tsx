@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
@@ -28,7 +29,9 @@ export default async function Page() {
         {properties.map((property) => (
           <div key={property.id} className="p-4 flex justify-between gap-4">
             <div>
-              <p className="font-medium">{property.name}</p>
+              <Link href={`/properties/${property.id}`} className="font-medium text-brand-navy">
+                {property.name}
+              </Link>
               <p className="text-sm text-slate-600">{property.address}, {property.city}, {property.state}</p>
             </div>
             <form action={archivePropertyAction}>

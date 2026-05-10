@@ -11,6 +11,7 @@ export type AuthContext = {
   role: UserRole;
   status: UserStatus;
   mustChangePassword: boolean;
+  name?: string | null;
 };
 
 export async function getActiveUser(): Promise<AuthContext | null> {
@@ -28,7 +29,7 @@ export async function getActiveUser(): Promise<AuthContext | null> {
         disabledById: null,
         disabledReason: null,
       },
-      select: { id: true, email: true, role: true, status: true, mustChangePassword: true },
+      select: { id: true, email: true, role: true, status: true, mustChangePassword: true, name: true },
     });
     return {
       userId: fixed.id,
@@ -36,6 +37,7 @@ export async function getActiveUser(): Promise<AuthContext | null> {
       role: fixed.role,
       status: fixed.status,
       mustChangePassword: fixed.mustChangePassword,
+      name: fixed.name,
     };
   }
 
@@ -45,6 +47,7 @@ export async function getActiveUser(): Promise<AuthContext | null> {
     role: user.role,
     status: user.status,
     mustChangePassword: user.mustChangePassword,
+    name: user.name,
   };
 }
 

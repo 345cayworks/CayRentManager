@@ -30,10 +30,40 @@ npm run dev
 - `DATABASE_URL`
 - `APP_SESSION_SECRET`
 - `NEXT_PUBLIC_APP_URL`
+- `SUPER_ADMIN_EMAIL`
+- `SUPERADMIN_MASTER_KEY`
 
 Only `NEXT_PUBLIC_APP_URL` is public. Do not prefix secrets with `NEXT_PUBLIC_`.
 
 Use a long random value for `APP_SESSION_SECRET`. Enable Netlify Identity in the Netlify UI for the `cayrentmanager` site and keep public registration enabled while landlord self-signup is open.
+
+## MVP Netlify Identity setup
+
+Recommended MVP setting:
+
+- Use invite-only or controlled registration while testing.
+- Manually create or invite `info@cayworks.com` in Netlify Identity.
+- Confirm/verify the Identity user in the Netlify dashboard if possible.
+- If confirmation emails are unreliable, temporarily disable required email confirmation for MVP QA.
+- After login succeeds, the app bootstraps `info@cayworks.com` as `SUPERADMIN`.
+
+To prepare the app-side Superadmin profile, run:
+
+```bash
+node scripts/bootstrap-owner.mjs
+```
+
+Run this only after the Netlify Identity user exists or before first login to prepare the app-side Superadmin profile. This script does not create the Netlify Identity login account and never stores passwords in Prisma.
+
+Emergency owner bootstrap endpoint:
+
+- `POST /api/admin/bootstrap-owner` is an emergency repair endpoint only. It is not the normal login system.
+- The request body must include `{ "masterKey": "..." }`.
+- The endpoint reads `SUPER_ADMIN_EMAIL` and `SUPERADMIN_MASTER_KEY` from server environment variables.
+- Use a long random value for `SUPERADMIN_MASTER_KEY`.
+- The master key must never be committed, printed, stored in the database, or exposed with `NEXT_PUBLIC_`.
+- Disable or remove this endpoint after the owner is confirmed if desired.
+- Normal app access still requires Netlify Identity login.
 
 ## Auth model
 
@@ -43,7 +73,7 @@ This rewrite uses **Netlify Identity** for authentication and Prisma for app rol
 - After Identity login, the app syncs the Identity user to a Prisma `User` and creates a signed app session cookie.
 - App database roles and statuses are the source of truth.
 - `info@cayworks.com` is bootstrapped server-side as `SUPERADMIN` and `ACTIVE`.
-- The primary Superadmin email `info@cayworks.com` must be confirmed in Netlify Identity before it can bootstrap as `SUPERADMIN` in the app.
+- The primary Superadmin email `info@cayworks.com` must be confirmed in Netlify Identity before it can bootstrap as `SUPERADMIN` in the app through normal login.
 - Disabled users are blocked by the app session bridge and server guards.
 - Public registration creates `LANDLORD` users and workspaces only.
 - Tenant onboarding requires `/invite/[token]`.

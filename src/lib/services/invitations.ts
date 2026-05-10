@@ -24,45 +24,64 @@ export async function acceptTenantInvitation(token: string, authEmail: string, f
   if (invitation.expiresAt < new Date()) throw new Error('Invite expired');
   if (invitation.email.toLowerCase() !== authEmail.toLowerCase()) throw new Error('Email mismatch');
 
-  const existing = await prisma.user.findUnique({ where: { email: authEmail.toLowerCase() } });
-  const user = existing
-    ? await prisma.user.update({
-        where: { id: existing.id },
-        data: {
-          netlifyUserId: netlifyUserId ?? existing.netlifyUserId,
-          fullName,
-          name: fullName,
-          role: UserRole.TENANT,
-          status: existing.status === UserStatus.DISABLED ? UserStatus.DISABLED : UserStatus.ACTIVE,
-          lastLoginAt: new Date(),
-        },
-      })
-    : await prisma.user.create({
-      data: {
-      netlifyUserId,
-      email: authEmail.toLowerCase(),
-      name: fullName,
-      fullName,
-      role: UserRole.TENANT,
-      status: UserStatus.ACTIVE,
-      lastLoginAt: new Date(),
-    },
-  });
+  const email = authEmail.toLowerCase();
 
-  const tenant = await prisma.tenant.create({
-    data: {
-      landlordId: invitation.landlordId,
-      userId: user.id,
-      fullName,
-      email: authEmail.toLowerCase(),
-      status: RecordStatus.ACTIVE,
-    },
-  });
+  return prisma.$transaction(async (tx) => {
+    const currentInvitation = await tx.tenantInvitation.findUnique({ where: { id: invitation.id } });
+    if (!currentInvitation) throw new Error('Invite not found');
+    if (currentInvitation.status !== InvitationStatus.PENDING) throw new Error('Invite is not pending');
+    if (currentInvitation.expiresAt < new Date()) throw new Error('Invite expired');
+    if (currentInvitation.email.toLowerCase() !== email) throw new Error('Email mismatch');
 
-  await prisma.tenantInvitation.update({
-    where: { id: invitation.id },
-    data: { status: InvitationStatus.ACCEPTED, acceptedAt: new Date() },
-  });
+    const existingUser = await tx.user.findUnique({ where: { email } });
+    const user = existingUser
+      ? await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            netlifyUserId: netlifyUserId ?? existingUser.netlifyUserId,
+            fullName,
+            name: fullName,
+            role: UserRole.TENANT,
+            status: existingUser.status === UserStatus.DISABLED ? UserStatus.DISABLED : UserStatus.ACTIVE,
+            lastLoginAt: new Date(),
+          },
+        })
+      : await tx.user.create({
+          data: {
+            netlifyUserId,
+            email,
+            name: fullName,
+            fullName,
+            role: UserRole.TENANT,
+            status: UserStatus.ACTIVE,
+            lastLoginAt: new Date(),
+          },
+        });
 
-  return { user, tenant };
+    const existingTenant = await tx.tenant.findUnique({
+      where: { landlordId_email: { landlordId: currentInvitation.landlordId, email } },
+    });
+
+    const tenant = existingTenant
+      ? await tx.tenant.update({
+          where: { id: existingTenant.id },
+          data: { userId: user.id, fullName, status: RecordStatus.ACTIVE },
+        })
+      : await tx.tenant.create({
+          data: {
+            landlordId: currentInvitation.landlordId,
+            userId: user.id,
+            fullName,
+            email,
+            status: RecordStatus.ACTIVE,
+          },
+        });
+
+    await tx.tenantInvitation.update({
+      where: { id: currentInvitation.id },
+      data: { status: InvitationStatus.ACCEPTED, acceptedAt: new Date() },
+    });
+
+    return { user, tenant };
+  });
 }

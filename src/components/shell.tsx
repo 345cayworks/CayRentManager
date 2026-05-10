@@ -1,13 +1,44 @@
 import Link from 'next/link';
+import { UserRole } from '@prisma/client';
+import { getActiveUser } from '@/lib/auth/guards';
 
-export function Shell({ title, children }: { title: string; children?: React.ReactNode }) {
+const adminLinks = [
+  ['/admin', 'Dashboard'],
+  ['/admin/users', 'Users'],
+  ['/admin/landlords', 'Landlords'],
+  ['/admin/audit', 'Audit'],
+];
+
+const landlordLinks = [
+  ['/dashboard', 'Dashboard'],
+  ['/properties', 'Properties'],
+  ['/units', 'Units'],
+  ['/tenants', 'Tenants'],
+  ['/leases', 'Leases'],
+  ['/payments', 'Payments'],
+  ['/expenses', 'Expenses'],
+];
+
+const tenantLinks = [['/tenant/dashboard', 'Dashboard']];
+
+function linksForRole(role?: UserRole) {
+  if (role === UserRole.SUPERADMIN) return adminLinks;
+  if (role === UserRole.TENANT) return tenantLinks;
+  if (role === UserRole.LANDLORD || role === UserRole.PROPERTY_MANAGER || role === UserRole.ACCOUNTANT) return landlordLinks;
+  return [];
+}
+
+export async function Shell({ title, children }: { title: string; children?: React.ReactNode }) {
+  const user = await getActiveUser();
+  const links = linksForRole(user?.role);
+
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr]">
       <aside className="bg-brand-navy text-white p-4 space-y-2">
         <h1 className="text-lg font-semibold mb-4">RentFlow Manager</h1>
-        {['/dashboard', '/properties', '/units', '/tenants', '/leases', '/payments', '/expenses', '/maintenance', '/documents', '/reports', '/settings'].map((href) => (
+        {links.map(([href, label]) => (
           <Link key={href} className="block text-sm hover:underline" href={href}>
-            {href}
+            {label}
           </Link>
         ))}
       </aside>

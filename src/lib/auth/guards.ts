@@ -3,6 +3,7 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { getAppSessionUser } from '@/lib/auth/session';
 import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
 import { prisma } from '@/lib/db/prisma';
+import { isPrimarySuperadminEmail } from '@/lib/identity/sync';
 
 export type AuthContext = {
   userId: string;
@@ -15,7 +16,7 @@ export async function getActiveUser(): Promise<AuthContext | null> {
   const user = await getAppSessionUser();
   if (!user?.email) return null;
 
-  if (user.email.toLowerCase() === 'info@cayworks.com' && (user.role !== UserRole.SUPERADMIN || user.status !== UserStatus.ACTIVE)) {
+  if (isPrimarySuperadminEmail(user.email) && (user.role !== UserRole.SUPERADMIN || user.status !== UserStatus.ACTIVE)) {
     const fixed = await prisma.user.update({
       where: { id: user.id },
       data: {

@@ -23,6 +23,10 @@ async function audit(actorUserId: string, actorEmail: string, action: string, en
   });
 }
 
+function assertSingleWorkspaceUpdate(result: { count: number }) {
+  if (result.count !== 1) throw new Error('Record not found for this workspace.');
+}
+
 export async function registerLandlordAction(formData: FormData) {
   const result = await registerPublicLandlord({
     email: text(formData, 'email'),
@@ -198,7 +202,7 @@ export async function reactivateUserAction(formData: FormData) {
   const actor = await requireSuperadmin();
   const user = await prisma.user.update({
     where: { id: text(formData, 'userId') },
-    data: { status: UserStatus.ACTIVE, disabledAt: null, disabledBy: null, disabledReason: null },
+    data: { status: UserStatus.ACTIVE, disabledAt: null, disabledBy: null, disabledById: null, disabledReason: null },
   });
   await audit(actor.userId, actor.email, 'user.reactivated', 'User', user.id, undefined, { targetEmail: user.email });
   revalidatePath('/admin/users');
@@ -210,12 +214,34 @@ export async function assignUserRoleAction(formData: FormData) {
   const role = text(formData, 'role') as UserRole;
   if (!Object.values(UserRole).includes(role)) throw new Error('Invalid role.');
 
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      tenantProfile: true,
+      memberships: { where: { status: RecordStatus.ACTIVE, landlord: { status: RecordStatus.ACTIVE } } },
+    },
+  });
+  if (!target) throw new Error('User not found.');
+
+  if (target.role === UserRole.SUPERADMIN && target.status === UserStatus.ACTIVE && role !== UserRole.SUPERADMIN) {
+    const activeSuperadmins = await prisma.user.count({ where: { role: UserRole.SUPERADMIN, status: UserStatus.ACTIVE } });
+    if (activeSuperadmins <= 1) throw new Error('You cannot remove the only active superadmin.');
+  }
+
+  if (role === UserRole.TENANT && !target.tenantProfile) {
+    throw new Error('Assign the TENANT role only after a tenant profile exists.');
+  }
+
+  if ((role === UserRole.PROPERTY_MANAGER || role === UserRole.ACCOUNTANT) && target.memberships.length === 0) {
+    throw new Error('Assign a landlord workspace membership before assigning this role.');
+  }
+
   const user = await prisma.user.update({
     where: { id: userId },
     data: { role },
   });
 
-  await audit(actor.userId, actor.email, 'user.role_assigned', 'User', user.id, undefined, { targetEmail: user.email, role });
+  await audit(actor.userId, actor.email, 'user.role_assigned', 'User', user.id, undefined, { targetEmail: user.email, previousRole: target.role, role });
   revalidatePath('/admin/users');
 }
 
@@ -241,109 +267,129 @@ export async function reactivateLandlordAction(formData: FormData) {
 
 export async function archivePropertyAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const property = await prisma.property.update({
+  const propertyId = text(formData, 'propertyId');
+  const result = await prisma.property.updateMany({
     where: { id: text(formData, 'propertyId'), landlordId },
     data: { status: RecordStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'property.archived', 'Property', property.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'property.archived', 'Property', propertyId, landlordId);
   revalidatePath('/properties');
   revalidatePath('/dashboard');
 }
 
 export async function archiveUnitAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const unit = await prisma.unit.update({
-    where: { id: text(formData, 'unitId'), landlordId },
+  const unitId = text(formData, 'unitId');
+  const result = await prisma.unit.updateMany({
+    where: { id: unitId, landlordId },
     data: { status: RecordStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'unit.archived', 'Unit', unit.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'unit.archived', 'Unit', unitId, landlordId);
   revalidatePath('/units');
   revalidatePath('/dashboard');
 }
 
 export async function deactivateTenantAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const tenant = await prisma.tenant.update({
-    where: { id: text(formData, 'tenantId'), landlordId },
+  const tenantId = text(formData, 'tenantId');
+  const result = await prisma.tenant.updateMany({
+    where: { id: tenantId, landlordId },
     data: { status: RecordStatus.INACTIVE, deactivatedAt: new Date(), deactivatedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'tenant.deactivated', 'Tenant', tenant.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'tenant.deactivated', 'Tenant', tenantId, landlordId);
   revalidatePath('/tenants');
   revalidatePath('/dashboard');
 }
 
 export async function terminateLeaseAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const lease = await prisma.lease.update({
-    where: { id: text(formData, 'leaseId'), landlordId },
+  const leaseId = text(formData, 'leaseId');
+  const result = await prisma.lease.updateMany({
+    where: { id: leaseId, landlordId },
     data: { status: LeaseStatus.TERMINATED, terminatedAt: new Date(), terminatedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'lease.terminated', 'Lease', lease.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'lease.terminated', 'Lease', leaseId, landlordId);
   revalidatePath('/leases');
   revalidatePath('/dashboard');
 }
 
 export async function expireLeaseAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const lease = await prisma.lease.update({
-    where: { id: text(formData, 'leaseId'), landlordId },
+  const leaseId = text(formData, 'leaseId');
+  const result = await prisma.lease.updateMany({
+    where: { id: leaseId, landlordId },
     data: { status: LeaseStatus.EXPIRED },
   });
-  await audit(user.userId, user.email, 'lease.expired', 'Lease', lease.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'lease.expired', 'Lease', leaseId, landlordId);
   revalidatePath('/leases');
   revalidatePath('/dashboard');
 }
 
 export async function voidPaymentAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const payment = await prisma.payment.update({
-    where: { id: text(formData, 'paymentId'), landlordId },
+  const paymentId = text(formData, 'paymentId');
+  const result = await prisma.payment.updateMany({
+    where: { id: paymentId, landlordId },
     data: { status: PaymentStatus.VOID, voidedAt: new Date(), voidedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'payment.voided', 'Payment', payment.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'payment.voided', 'Payment', paymentId, landlordId);
   revalidatePath('/payments');
   revalidatePath('/dashboard');
 }
 
 export async function voidExpenseAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const expense = await prisma.expense.update({
-    where: { id: text(formData, 'expenseId'), landlordId },
+  const expenseId = text(formData, 'expenseId');
+  const result = await prisma.expense.updateMany({
+    where: { id: expenseId, landlordId },
     data: { status: RecordStatus.VOID, voidedAt: new Date(), voidedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'expense.voided', 'Expense', expense.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'expense.voided', 'Expense', expenseId, landlordId);
   revalidatePath('/expenses');
   revalidatePath('/dashboard');
 }
 
 export async function archiveDocumentAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const document = await prisma.document.update({
-    where: { id: text(formData, 'documentId'), landlordId },
+  const documentId = text(formData, 'documentId');
+  const result = await prisma.document.updateMany({
+    where: { id: documentId, landlordId },
     data: { status: RecordStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'document.archived', 'Document', document.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'document.archived', 'Document', documentId, landlordId);
   revalidatePath('/documents');
 }
 
 export async function closeMaintenanceAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const request = await prisma.maintenanceRequest.update({
-    where: { id: text(formData, 'maintenanceId'), landlordId },
+  const maintenanceId = text(formData, 'maintenanceId');
+  const result = await prisma.maintenanceRequest.updateMany({
+    where: { id: maintenanceId, landlordId },
     data: { status: MaintenanceStatus.CLOSED },
   });
-  await audit(user.userId, user.email, 'maintenance.closed', 'MaintenanceRequest', request.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'maintenance.closed', 'MaintenanceRequest', maintenanceId, landlordId);
   revalidatePath('/maintenance');
   revalidatePath('/dashboard');
 }
 
 export async function archiveMaintenanceAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const request = await prisma.maintenanceRequest.update({
-    where: { id: text(formData, 'maintenanceId'), landlordId },
+  const maintenanceId = text(formData, 'maintenanceId');
+  const result = await prisma.maintenanceRequest.updateMany({
+    where: { id: maintenanceId, landlordId },
     data: { status: MaintenanceStatus.ARCHIVED, archivedAt: new Date(), archivedBy: user.userId },
   });
-  await audit(user.userId, user.email, 'maintenance.archived', 'MaintenanceRequest', request.id, landlordId);
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'maintenance.archived', 'MaintenanceRequest', maintenanceId, landlordId);
   revalidatePath('/maintenance');
   revalidatePath('/dashboard');
 }

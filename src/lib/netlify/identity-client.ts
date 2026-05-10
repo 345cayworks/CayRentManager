@@ -8,6 +8,7 @@ import {
   logout as netlifyLogout,
   onAuthChange,
   signup as netlifySignup,
+  updateUser as netlifyUpdateUser,
   type User,
 } from '@netlify/identity';
 
@@ -27,6 +28,12 @@ export async function login(email: string, password: string) {
 
 export async function signup(email: string, password: string, fullName?: string) {
   return netlifySignup(email, password, fullName ? { full_name: fullName } : undefined);
+}
+
+export async function updatePassword(password: string) {
+  const user = getUser();
+  if (!user) throw new Error('Not authenticated.');
+  return netlifyUpdateUser({ password });
 }
 
 export async function logout() {

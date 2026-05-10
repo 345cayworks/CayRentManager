@@ -10,6 +10,7 @@ export type AuthContext = {
   email: string;
   role: UserRole;
   status: UserStatus;
+  mustChangePassword: boolean;
 };
 
 export async function getActiveUser(): Promise<AuthContext | null> {
@@ -27,18 +28,48 @@ export async function getActiveUser(): Promise<AuthContext | null> {
         disabledById: null,
         disabledReason: null,
       },
-      select: { id: true, email: true, role: true, status: true },
+      select: { id: true, email: true, role: true, status: true, mustChangePassword: true },
     });
-    return { userId: fixed.id, email: fixed.email, role: fixed.role, status: fixed.status };
+    return {
+      userId: fixed.id,
+      email: fixed.email,
+      role: fixed.role,
+      status: fixed.status,
+      mustChangePassword: fixed.mustChangePassword,
+    };
   }
 
-  return { userId: user.id, email: user.email, role: user.role, status: user.status };
+  return {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    mustChangePassword: user.mustChangePassword,
+  };
 }
 
 export async function requireAuth(): Promise<AuthContext> {
   const user = await getActiveUser();
   if (!user) redirect('/login');
+
+  if (user.status === UserStatus.SUSPENDED) redirect('/login?error=suspended');
+  if (user.status === UserStatus.INACTIVE) redirect('/login?error=inactive');
+  if (user.status === UserStatus.PENDING_INVITE) redirect('/login?error=pending_invite');
   if (user.status !== UserStatus.ACTIVE) redirect('/login?error=disabled');
+  if (user.mustChangePassword) redirect('/change-password');
+
+  return user;
+}
+
+export async function requireAuthAllowPasswordChange(): Promise<AuthContext> {
+  const user = await getActiveUser();
+  if (!user) redirect('/login');
+
+  if (user.status === UserStatus.SUSPENDED) redirect('/login?error=suspended');
+  if (user.status === UserStatus.INACTIVE) redirect('/login?error=inactive');
+  if (user.status === UserStatus.PENDING_INVITE) redirect('/login?error=pending_invite');
+  if (user.status !== UserStatus.ACTIVE) redirect('/login?error=disabled');
+
   return user;
 }
 

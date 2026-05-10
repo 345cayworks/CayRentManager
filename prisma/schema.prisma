@@ -17,6 +17,9 @@ enum UserRole {
 
 enum UserStatus {
   ACTIVE
+  PENDING_INVITE
+  INACTIVE
+  SUSPENDED
   INVITED
   DISABLED
 }
@@ -72,12 +75,15 @@ model User {
   status         UserStatus @default(ACTIVE)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  lastLoginAt    DateTime?
-  disabledAt     DateTime?
-  disabledBy     String?
-  disabledById   String?
-  disabledReason String?
-  appSessions    AppSession[]
+  lastLoginAt             DateTime?
+  disabledAt              DateTime?
+  disabledBy              String?
+  disabledById            String?
+  disabledReason          String?
+  mustChangePassword      Boolean   @default(false)
+  temporaryPasswordHash   String?   @db.Text
+  temporaryPasswordSetAt  DateTime?
+  appSessions             AppSession[]
 
   accounts         Account[]
   sessions         Session[]

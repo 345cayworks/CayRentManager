@@ -4,9 +4,25 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { createAppSession } from '@/lib/auth/session';
 import { syncIdentityUser } from '@/lib/identity/sync';
 
-function getRedirectPath(role: UserRole | string, status: UserStatus | string) {
+function getRedirectPath(role: UserRole | string, status: UserStatus | string, mustChangePassword?: boolean) {
+  if (status === UserStatus.SUSPENDED || status === 'SUSPENDED') {
+    return '/login?error=suspended';
+  }
+
+  if (status === UserStatus.INACTIVE || status === 'INACTIVE') {
+    return '/login?error=inactive';
+  }
+
+  if (status === UserStatus.PENDING_INVITE || status === 'PENDING_INVITE') {
+    return '/login?error=pending_invite';
+  }
+
   if (status === UserStatus.DISABLED || status === 'DISABLED') {
     return '/login?error=disabled';
+  }
+
+  if (mustChangePassword) {
+    return '/change-password';
   }
 
   switch (role) {
@@ -58,11 +74,12 @@ export async function POST(request: Request) {
     email: user.email,
     role: user.role,
     status: user.status,
+    mustChangePassword: user.mustChangePassword,
   };
 
   return NextResponse.json({
     user: appUser,
     createdWorkspace,
-    redirectTo: getRedirectPath(appUser.role, appUser.status),
+    redirectTo: getRedirectPath(appUser.role, appUser.status, appUser.mustChangePassword),
   });
 }

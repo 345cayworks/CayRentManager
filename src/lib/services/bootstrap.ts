@@ -1,11 +1,13 @@
 import { UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
-
-const PRIMARY_SUPERADMIN = 'info@cayworks.com';
+import { getPrimarySuperadminEmail } from '@/lib/identity/sync';
 
 export async function ensurePrimarySuperadmin() {
+  const primaryEmail = getPrimarySuperadminEmail();
+  if (!primaryEmail) throw new Error('SUPER_ADMIN_EMAIL is required.');
+
   return prisma.user.upsert({
-    where: { email: PRIMARY_SUPERADMIN },
+    where: { email: primaryEmail },
     update: {
       role: UserRole.SUPERADMIN,
       status: UserStatus.ACTIVE,
@@ -14,7 +16,7 @@ export async function ensurePrimarySuperadmin() {
       disabledReason: null,
     },
     create: {
-      email: PRIMARY_SUPERADMIN,
+      email: primaryEmail,
       name: 'Primary Superadmin',
       fullName: 'Primary Superadmin',
       role: UserRole.SUPERADMIN,

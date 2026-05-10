@@ -30,6 +30,8 @@ npm run dev
 - `DATABASE_URL`
 - `APP_SESSION_SECRET`
 - `NEXT_PUBLIC_APP_URL`
+- `SUPER_ADMIN_EMAIL`
+- `SUPERADMIN_MASTER_KEY`
 
 Only `NEXT_PUBLIC_APP_URL` is public. Do not prefix secrets with `NEXT_PUBLIC_`.
 
@@ -53,12 +55,15 @@ node scripts/bootstrap-owner.mjs
 
 Run this only after the Netlify Identity user exists or before first login to prepare the app-side Superadmin profile. This script does not create the Netlify Identity login account and never stores passwords in Prisma.
 
-Temporary owner bootstrap route:
+Emergency owner bootstrap endpoint:
 
-- `/api/debug/bootstrap-owner` is a temporary recovery endpoint and must be disabled or removed before real production onboarding.
-- It only works when `OWNER_BOOTSTRAP_SECRET` is set and the request includes `/api/debug/bootstrap-owner?secret=...`.
-- `OWNER_BOOTSTRAP_SECRET` must never be committed, printed, or exposed with `NEXT_PUBLIC_`.
-- If `OWNER_BOOTSTRAP_SECRET` is missing, the route returns a safe failure and cannot bootstrap the owner.
+- `POST /api/admin/bootstrap-owner` is an emergency repair endpoint only. It is not the normal login system.
+- The request body must include `{ "masterKey": "..." }`.
+- The endpoint reads `SUPER_ADMIN_EMAIL` and `SUPERADMIN_MASTER_KEY` from server environment variables.
+- Use a long random value for `SUPERADMIN_MASTER_KEY`.
+- The master key must never be committed, printed, stored in the database, or exposed with `NEXT_PUBLIC_`.
+- Disable or remove this endpoint after the owner is confirmed if desired.
+- Normal app access still requires Netlify Identity login.
 
 ## Auth model
 

@@ -1,7 +1,7 @@
 import { getConnectionString } from '@netlify/database';
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
 
-const OWNER_EMAIL = 'info@cayworks.com';
+const OWNER_EMAIL = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
 
 function getDatasourceUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
@@ -18,6 +18,8 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
+  if (!OWNER_EMAIL) throw new Error('SUPER_ADMIN_EMAIL is required.');
+
   const existing = await prisma.user.findUnique({ where: { email: OWNER_EMAIL } });
   const user = existing
     ? await prisma.user.update({

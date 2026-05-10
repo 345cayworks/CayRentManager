@@ -1,8 +1,6 @@
 import { RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 
-export const PRIMARY_SUPERADMIN_EMAIL = 'info@cayworks.com';
-
 export type IdentitySyncInput = {
   netlifyUserId: string;
   email: string;
@@ -13,6 +11,15 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+export function getPrimarySuperadminEmail() {
+  return normalizeEmail(process.env.SUPER_ADMIN_EMAIL ?? '');
+}
+
+export function isPrimarySuperadminEmail(email: string) {
+  const primaryEmail = getPrimarySuperadminEmail();
+  return Boolean(primaryEmail) && normalizeEmail(email) === primaryEmail;
+}
+
 async function writeAudit(actorUserId: string, actorEmail: string, action: string, entityType: string, entityId: string, landlordId?: string, details = {}) {
   await prisma.auditLog.create({
     data: { actorUserId, actorEmail, action, entityType, entityId, landlordId, details },
@@ -21,7 +28,8 @@ async function writeAudit(actorUserId: string, actorEmail: string, action: strin
 
 export async function bootstrapPrimaryOwner(input: IdentitySyncInput, action = 'owner_bootstrapped') {
   const email = normalizeEmail(input.email);
-  if (email !== PRIMARY_SUPERADMIN_EMAIL) throw new Error('Only the primary platform owner can be bootstrapped.');
+  if (!getPrimarySuperadminEmail()) throw new Error('SUPER_ADMIN_EMAIL is required.');
+  if (!isPrimarySuperadminEmail(email)) throw new Error('Only the primary platform owner can be bootstrapped.');
   if (!input.netlifyUserId) throw new Error('Netlify Identity id is required.');
 
   const fullName = input.fullName?.trim() || 'Platform Owner';
@@ -70,7 +78,7 @@ export async function syncIdentityUser(input: IdentitySyncInput) {
   if (!input.netlifyUserId || !email) throw new Error('Netlify Identity id and email are required.');
 
   const fullName = input.fullName?.trim() || email;
-  const isPrimarySuperadmin = email === PRIMARY_SUPERADMIN_EMAIL;
+  const isPrimarySuperadmin = isPrimarySuperadminEmail(email);
 
   if (isPrimarySuperadmin) {
     const user = await bootstrapPrimaryOwner({ ...input, fullName }, 'superadmin_bootstrapped');

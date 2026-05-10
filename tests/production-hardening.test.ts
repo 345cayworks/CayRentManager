@@ -9,11 +9,15 @@ function read(relativePath: string) {
 }
 
 describe('production hardening guardrails', () => {
-  it('protects the temporary owner bootstrap route with a non-public secret', () => {
-    const route = read('src/app/api/debug/bootstrap-owner/route.ts');
+  it('removes the public debug bootstrap route and protects owner bootstrap with env master key', () => {
+    const route = read('src/app/api/admin/bootstrap-owner/route.ts');
 
-    expect(route).toContain('OWNER_BOOTSTRAP_SECRET');
-    expect(route).toContain("searchParams.get('secret')");
+    expect(fs.existsSync(path.join(root, 'src/app/api/debug/bootstrap-owner/route.ts'))).toBe(false);
+    expect(route).toContain('SUPER_ADMIN_EMAIL');
+    expect(route).toContain('SUPERADMIN_MASTER_KEY');
+    expect(route).toContain('masterKey');
+    expect(route).toContain('timingSafeEqual');
+    expect(route).not.toContain('GET(');
     expect(route).toContain('status: 403');
     expect(route).toContain('status: 404');
   });

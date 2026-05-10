@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { PaymentStatus } from '@prisma/client';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,23 +30,24 @@ export async function GET(request: NextRequest) {
     const csvRows = payments.map(payment => [
       payment.dueDate.toISOString().split('T')[0],
       payment.paymentDate?.toISOString().split('T')[0] ?? '',
-      `"${payment.tenant.fullName}"`,
-      `"${payment.unit.property.name}"`,
-      `"${payment.unit.unitName}"`,
+      payment.tenant.fullName,
+      payment.unit.property.name,
+      payment.unit.unitName,
       payment.amountDue.toString(),
       (payment.amountPaid ?? 0).toString(),
       payment.balance.toString(),
       payment.status,
-      `"${payment.paymentMethod ?? ''}"`,
-      `"${payment.notes ?? ''}"`
+      payment.paymentMethod ?? '',
+      payment.notes ?? ''
     ]);
 
-    const csvContent = [csvHeaders, ...csvRows].map(row => row.join(',')).join('\n');
+    const csvContent = createCsvContent(csvHeaders, csvRows);
+    const filename = createSafeCsvFilename('payments');
 
     return new Response(csvContent, {
       headers: {
         'Content-Type': 'text/csv',
-        'Content-Disposition': 'attachment; filename="payments.csv"'
+        'Content-Disposition': `attachment; filename="${filename}"`
       }
     });
   } catch (error) {

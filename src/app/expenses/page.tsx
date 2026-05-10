@@ -4,15 +4,14 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { recordExpenseAction, voidExpenseAction } from '@/server/actions';
+import { getCurrentMonthRange } from '@/lib/finance/landlord-financials';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const { start: startOfMonth, end: endOfMonth } = getCurrentMonthRange();
 
   const [properties, units, expenses] = await Promise.all([
     prisma.property.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, orderBy: { name: 'asc' } }),
@@ -20,7 +19,7 @@ export default async function Page() {
     prisma.expense.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, include: { property: true, unit: true }, orderBy: { expenseDate: 'desc' } }),
   ]);
 
-  const thisMonthExpenses = expenses.filter(e => e.expenseDate >= startOfMonth && e.expenseDate <= endOfMonth);
+  const thisMonthExpenses = expenses.filter(e => e.expenseDate >= startOfMonth && e.expenseDate < endOfMonth);
   const totalExpensesThisMonth = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalExpensesAllTime = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 

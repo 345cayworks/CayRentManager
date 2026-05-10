@@ -4,15 +4,15 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { recordPaymentAction, voidPaymentAction } from '@/server/actions';
+import { getCurrentMonthRange } from '@/lib/finance/landlord-financials';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
 
+  const { start: startOfMonth, end: endOfMonth } = getCurrentMonthRange();
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   const [leases, payments, tenants, properties] = await Promise.all([
     prisma.lease.findMany({ where: { landlordId, status: 'ACTIVE' }, include: { tenant: true, unit: true }, orderBy: { createdAt: 'desc' } }),
@@ -25,9 +25,10 @@ export default async function Page() {
     prisma.property.findMany({ where: { landlordId, status: 'ACTIVE' }, orderBy: { name: 'asc' } }),
   ]);
 
-  const thisMonthPayments = payments.filter(p => p.dueDate >= startOfMonth && p.dueDate <= endOfMonth);
-  const totalDueThisMonth = thisMonthPayments.reduce((sum, p) => sum + Number(p.amountDue), 0);
-  const totalCollectedThisMonth = thisMonthPayments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0);
+  const thisMonthDuePayments = payments.filter(p => p.dueDate >= startOfMonth && p.dueDate < endOfMonth);
+  const thisMonthCollectedPayments = payments.filter(p => p.paymentDate && p.paymentDate >= startOfMonth && p.paymentDate < endOfMonth);
+  const totalDueThisMonth = thisMonthDuePayments.reduce((sum, p) => sum + Number(p.amountDue), 0);
+  const totalCollectedThisMonth = thisMonthCollectedPayments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0);
   const outstandingBalance = payments.reduce((sum, p) => sum + Number(p.balance), 0);
   const overdueAmount = payments.filter(p => p.dueDate < now && Number(p.balance) > 0).reduce((sum, p) => sum + Number(p.balance), 0);
 

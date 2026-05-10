@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db/prisma';
 import { requireLandlordAccess, getCurrentLandlordWorkspace, requireSuperadmin } from '@/lib/auth/guards';
 import { registerPublicLandlord } from '@/lib/services/registration';
 import { acceptTenantInvitation, createTenantInvitation } from '@/lib/services/invitations';
+import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
@@ -181,24 +182,25 @@ export async function exportPaymentsCsvAction() {
   const csvRows = payments.map(payment => [
     payment.dueDate.toISOString().split('T')[0],
     payment.paymentDate?.toISOString().split('T')[0] ?? '',
-    `"${payment.tenant.fullName}"`,
-    `"${payment.unit.property.name}"`,
-    `"${payment.unit.unitName}"`,
+    payment.tenant.fullName,
+    payment.unit.property.name,
+    payment.unit.unitName,
     payment.amountDue.toString(),
     (payment.amountPaid ?? 0).toString(),
     payment.balance.toString(),
     payment.status,
-    `"${payment.paymentMethod ?? ''}"`,
-    `"${payment.notes ?? ''}"`
+    payment.paymentMethod ?? '',
+    payment.notes ?? ''
   ]);
 
-  const csvContent = [csvHeaders, ...csvRows].map(row => row.join(',')).join('\n');
+  const csvContent = createCsvContent(csvHeaders, csvRows);
+  const filename = createSafeCsvFilename('payments');
 
   // Return CSV as response
   const response = new Response(csvContent, {
     headers: {
       'Content-Type': 'text/csv',
-      'Content-Disposition': 'attachment; filename="payments.csv"'
+      'Content-Disposition': `attachment; filename="${filename}"`
     }
   });
 

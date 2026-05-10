@@ -1,10 +1,21 @@
 import { LeaseStatus, MaintenanceStatus, PaymentStatus, RecordStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
+import { getCurrentMonthRange } from './landlord-financials';
 
-export async function getLandlordDashboardMetrics(landlordId: string) {
+export interface LandlordDashboardMetrics {
+  monthlyRentExpected: number;
+  monthlyRentCollected: number;
+  outstandingBalance: number;
+  occupancyRate: number;
+  netCashflow: number;
+  activeTenants: number;
+  openMaintenance: number;
+  leaseExpirations: number;
+}
+
+export async function getLandlordDashboardMetrics(landlordId: string): Promise<LandlordDashboardMetrics> {
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
   const sixtyDays = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 60);
 
   const [units, leases, payments, expenses, activeTenants, openMaintenance] = await Promise.all([
@@ -17,12 +28,12 @@ export async function getLandlordDashboardMetrics(landlordId: string) {
       where: {
         landlordId,
         status: { not: PaymentStatus.VOID },
-        dueDate: { gte: monthStart, lt: nextMonth },
+        dueDate: { gte: monthStart, lt: monthEnd },
       },
       select: { amountDue: true, amountPaid: true, balance: true },
     }),
     prisma.expense.findMany({
-      where: { landlordId, status: RecordStatus.ACTIVE, expenseDate: { gte: monthStart, lt: nextMonth } },
+      where: { landlordId, status: RecordStatus.ACTIVE, expenseDate: { gte: monthStart, lt: monthEnd } },
       select: { amount: true },
     }),
     prisma.tenant.count({ where: { landlordId, status: RecordStatus.ACTIVE } }),

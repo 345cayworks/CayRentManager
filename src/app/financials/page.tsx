@@ -3,15 +3,14 @@ import { PaymentStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { getCurrentMonthRange, calculateOccupancyRate } from '@/lib/finance/landlord-financials';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const { start: startOfMonth, end: endOfMonth } = getCurrentMonthRange();
 
   const [properties, payments, expenses] = await Promise.all([
     prisma.property.findMany({
@@ -33,18 +32,21 @@ export default async function Page() {
   const totalUnits = properties.reduce((sum, p) => sum + p.units.length, 0);
   const totalLeases = properties.reduce((sum, p) => sum + p.leases.length, 0);
 
-  const thisMonthPayments = payments.filter(p => p.dueDate >= startOfMonth && p.dueDate <= endOfMonth);
-  const totalRentDueThisMonth = thisMonthPayments.reduce((sum, p) => sum + Number(p.amountDue), 0);
-  const totalRentCollectedThisMonth = thisMonthPayments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0);
+  const thisMonthDuePayments = payments.filter(p => p.dueDate >= startOfMonth && p.dueDate < endOfMonth);
+  const thisMonthCollectedPayments = payments.filter(p => p.paymentDate && p.paymentDate >= startOfMonth && p.paymentDate < endOfMonth);
+  const totalRentDueThisMonth = thisMonthDuePayments.reduce((sum, p) => sum + Number(p.amountDue), 0);
+  const totalRentCollectedThisMonth = thisMonthCollectedPayments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0);
 
-  const thisMonthExpenses = expenses.filter(e => e.expenseDate >= startOfMonth && e.expenseDate <= endOfMonth);
+  const thisMonthExpenses = expenses.filter(e => e.expenseDate >= startOfMonth && e.expenseDate < endOfMonth);
   const totalExpensesThisMonth = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
   const outstandingBalance = payments.reduce((sum, p) => sum + Number(p.balance), 0);
-  const overdueAmount = payments.filter(p => p.dueDate < now && Number(p.balance) > 0).reduce((sum, p) => sum + Number(p.balance), 0);
+  const overdueAmount = payments.filter(p => p.dueDate < new Date() && Number(p.balance) > 0).reduce((sum, p) => sum + Number(p.balance), 0);
 
   const monthlyRentExpected = properties.reduce((sum, p) => sum + p.leases.reduce((leaseSum, l) => leaseSum + Number(l.rentAmount), 0), 0);
   const netCashflow = totalRentCollectedThisMonth - totalExpensesThisMonth;
+
+  const occupancyRate = calculateOccupancyRate(properties);
 
   return (
     <Shell title="Financial Overview">

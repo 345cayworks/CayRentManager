@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { LeaseStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
@@ -36,7 +37,9 @@ export default async function Page() {
         {leases.map((lease) => (
           <div key={lease.id} className="p-4 flex justify-between gap-4">
             <div>
-              <p className="font-medium">{lease.tenant.fullName} / {lease.property.name} / {lease.unit.unitName}</p>
+              <Link href={`/leases/${lease.id}`} className="font-medium text-brand-navy">
+                {lease.tenant.fullName} / {lease.property.name} / {lease.unit.unitName}
+              </Link>
               <p className="text-sm text-slate-600">{lease.startDate.toLocaleDateString()} to {lease.endDate.toLocaleDateString()}</p>
             </div>
             <div className="text-right space-y-2">

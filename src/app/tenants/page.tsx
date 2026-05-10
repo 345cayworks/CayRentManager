@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
@@ -30,7 +31,9 @@ export default async function Page() {
           {tenants.map((tenant) => (
             <div key={tenant.id} className="p-4 flex justify-between gap-4">
               <div>
-                <p className="font-medium">{tenant.fullName}</p>
+                <Link href={`/tenants/${tenant.id}`} className="font-medium text-brand-navy">
+                  {tenant.fullName}
+                </Link>
                 <p className="text-sm text-slate-600">{tenant.email}</p>
               </div>
               <form action={deactivateTenantAction}>

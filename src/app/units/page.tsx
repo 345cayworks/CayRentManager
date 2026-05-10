@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
@@ -31,7 +32,9 @@ export default async function Page() {
         {units.map((unit) => (
           <div key={unit.id} className="p-4 flex justify-between">
             <div>
-              <p className="font-medium">{unit.unitName}</p>
+              <Link href={`/units/${unit.id}`} className="font-medium text-brand-navy">
+                {unit.unitName}
+              </Link>
               <p className="text-sm text-slate-600">{unit.property.name}</p>
             </div>
             <div className="text-right space-y-2">

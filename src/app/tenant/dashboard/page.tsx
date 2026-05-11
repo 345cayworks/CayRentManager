@@ -2,6 +2,7 @@ import { UserRole } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { requireRole } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { uploadPaymentProofAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,9 +28,10 @@ export default async function Page() {
   const tenant = await prisma.tenant.findFirst({
     where: user.role === UserRole.SUPERADMIN ? {} : { userId: user.userId },
     include: {
+      landlord: { include: { bankAccounts: true, paymentMethods: true } },
       leases: { include: { unit: true, property: true }, orderBy: { createdAt: 'desc' } },
       invoices: { include: { property: true, unit: true }, orderBy: { dueDate: 'desc' } },
-      payments: { include: { invoice: true, receipt: true, property: true, unit: true }, orderBy: { paymentDate: 'desc' } },
+      payments: { include: { invoice: true, receipt: true, paymentProofs: true, property: true, unit: true }, orderBy: { paymentDate: 'desc' } },
     },
   });
 
@@ -37,6 +39,8 @@ export default async function Page() {
   const outstandingBalance = tenant?.invoices.reduce((sum, invoice) => sum + Number(invoice.balance), 0) ?? 0;
   const paidTotal = tenant?.payments.reduce((sum, payment) => sum + Number(payment.amountPaid ?? 0), 0) ?? 0;
   const nextOpenInvoice = tenant?.invoices.find((invoice) => Number(invoice.balance) > 0);
+  const bankAccounts = tenant?.landlord.bankAccounts.filter((account) => account.status === 'ACTIVE') ?? [];
+  const paymentMethods = tenant?.landlord.paymentMethods.filter((method) => method.status === 'ACTIVE') ?? [];
 
   return (
     <Shell title="Tenant Dashboard">
@@ -86,6 +90,59 @@ export default async function Page() {
             ) : (
               <p className="text-sm text-slate-600 mt-2">No open invoices.</p>
             )}
+          </section>
+
+          <section className="rounded-xl bg-white border shadow-sm p-6">
+            <h3 className="font-semibold">Payment Instructions</h3>
+            <p className="text-sm text-slate-500 mt-1">Use these details when sending bank transfers or coordinating payment with your landlord.</p>
+            <div className="grid lg:grid-cols-2 gap-4 mt-4">
+              <div className="rounded-lg border p-4">
+                <h4 className="font-medium">Bank Transfer Accounts</h4>
+                {bankAccounts.length === 0 ? <p className="text-sm text-slate-600 mt-2">No bank transfer details have been published yet.</p> : (
+                  <div className="space-y-3 mt-3">
+                    {bankAccounts.map((account) => (
+                      <div key={account.id} className="text-sm border rounded p-3">
+                        <p className="font-medium">{account.bankName}{account.isDefault ? ' · Default' : ''}</p>
+                        <p>Account: {account.accountNumberMasked}</p>
+                        {account.accountName ? <p>Name: {account.accountName}</p> : null}
+                        {account.branch ? <p>Branch: {account.branch}</p> : null}
+                        {account.swiftCode ? <p>SWIFT: {account.swiftCode}</p> : null}
+                        {account.routingInfo ? <p className="text-slate-600">{account.routingInfo}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border p-4">
+                <h4 className="font-medium">Accepted Payment Methods</h4>
+                {paymentMethods.length === 0 ? <p className="text-sm text-slate-600 mt-2">No payment methods have been published yet.</p> : (
+                  <div className="space-y-3 mt-3">
+                    {paymentMethods.map((method) => (
+                      <div key={method.id} className="text-sm border rounded p-3">
+                        <p className="font-medium">{method.label}{method.isDefault ? ' · Default' : ''}</p>
+                        <p>{method.type.replaceAll('_', ' ')}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-xl bg-white border shadow-sm p-6">
+            <h3 className="font-semibold">Upload Payment Proof</h3>
+            <p className="text-sm text-slate-500 mt-1">For now, paste a secure link to your bank transfer receipt or payment confirmation. File upload storage will be added in a later step.</p>
+            <form action={uploadPaymentProofAction} className="grid md:grid-cols-4 gap-3 mt-4">
+              <select required name="paymentId" className="border rounded px-3 py-2 md:col-span-1">
+                <option value="">Payment</option>
+                {tenant.payments.map((payment) => (
+                  <option key={payment.id} value={payment.id}>{payment.invoice?.invoiceNo ?? 'Manual'} / {money(payment.amountPaid)}</option>
+                ))}
+              </select>
+              <input required name="fileUrl" placeholder="Proof URL" className="border rounded px-3 py-2 md:col-span-2" />
+              <input name="fileType" placeholder="Type, e.g. PDF or image" className="border rounded px-3 py-2" />
+              <button className="rounded bg-brand-navy text-white px-4 py-2 md:col-span-4">Submit payment proof</button>
+            </form>
           </section>
 
           <section className="rounded-xl bg-white border shadow-sm overflow-hidden">
@@ -143,6 +200,7 @@ export default async function Page() {
                       <th className="text-right p-3">Paid</th>
                       <th className="text-left p-3">Method</th>
                       <th className="text-left p-3">Receipt</th>
+                      <th className="text-left p-3">Proofs</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -154,6 +212,7 @@ export default async function Page() {
                         <td className="p-3 text-right">{money(payment.amountPaid)}</td>
                         <td className="p-3">{payment.paymentMethod ?? '—'}</td>
                         <td className="p-3">{payment.receipt?.receiptNo ?? 'Pending'}</td>
+                        <td className="p-3">{payment.paymentProofs.length}</td>
                       </tr>
                     ))}
                   </tbody>

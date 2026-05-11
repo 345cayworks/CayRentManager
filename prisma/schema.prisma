@@ -51,6 +51,27 @@ enum PaymentStatus {
   VOID
 }
 
+enum InvoiceStatus {
+  NEW
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum PaymentMethodType {
+  BANK_TRANSFER
+  CASH
+  CHEQUE
+  CARD
+  FYGARO_LINK
+  POWERTRANZ_CARD
+  CNB_GATEWAY
+  BUTTERFIELD_GATEWAY
+  OTHER
+}
+
 enum MaintenanceStatus {
   OPEN
   IN_PROGRESS
@@ -165,6 +186,9 @@ model LandlordProfile {
   invitations         TenantInvitation[]
   leases              Lease[]
   payments            Payment[]
+  invoices            Invoice[]
+  paymentMethods      PaymentMethod[]
+  bankAccounts        BankAccount[]
   expenses            Expense[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
@@ -209,6 +233,7 @@ model Property {
   invitations         TenantInvitation[]
   leases              Lease[]
   payments            Payment[]
+  invoices            Invoice[]
   expenses            Expense[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
@@ -235,6 +260,7 @@ model Unit {
   invitations         TenantInvitation[]
   leases              Lease[]
   payments            Payment[]
+  invoices            Invoice[]
   expenses            Expense[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
@@ -260,6 +286,7 @@ model Tenant {
   user                User?               @relation(fields: [userId], references: [id])
   leases              Lease[]
   payments            Payment[]
+  invoices            Invoice[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
 
@@ -308,35 +335,136 @@ model Lease {
   property Property        @relation(fields: [propertyId], references: [id])
   unit     Unit            @relation(fields: [unitId], references: [id])
   tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  invoices Invoice[]
   payments Payment[]
   documents Document[]
 }
 
-model Payment {
-  id            String        @id @default(cuid())
-  landlordId    String
-  tenantId      String
-  leaseId       String
-  propertyId    String
-  unitId        String
-  dueDate       DateTime
-  paymentDate   DateTime?
-  amountDue     Decimal
-  amountPaid    Decimal?      @default(0)
-  balance       Decimal
-  paymentMethod String?
-  status        PaymentStatus @default(PENDING)
-  notes         String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  voidedAt      DateTime?
-  voidedBy      String?
+model Invoice {
+  id          String        @id @default(cuid())
+  invoiceNo   String        @unique
+  landlordId  String
+  tenantId    String
+  leaseId     String
+  propertyId  String
+  unitId      String
+  amount      Decimal
+  amountPaid  Decimal       @default(0)
+  balance     Decimal
+  dueDate     DateTime
+  sentAt      DateTime?
+  paidAt      DateTime?
+  status      InvoiceStatus @default(NEW)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  voidedAt    DateTime?
+  voidedBy    String?
 
   landlord LandlordProfile @relation(fields: [landlordId], references: [id])
   tenant   Tenant          @relation(fields: [tenantId], references: [id])
   lease    Lease           @relation(fields: [leaseId], references: [id])
   property Property        @relation(fields: [propertyId], references: [id])
   unit     Unit            @relation(fields: [unitId], references: [id])
+  payments Payment[]
+
+  @@index([landlordId, dueDate])
+  @@index([landlordId, status])
+  @@index([tenantId, status])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  landlordId      String
+  tenantId        String
+  leaseId         String
+  propertyId      String
+  unitId          String
+  invoiceId       String?
+  paymentMethodId String?
+  dueDate         DateTime
+  paymentDate     DateTime?
+  amountDue       Decimal
+  amountPaid      Decimal?      @default(0)
+  balance         Decimal
+  paymentMethod   String?
+  status          PaymentStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  voidedAt        DateTime?
+  voidedBy        String?
+
+  landlord      LandlordProfile @relation(fields: [landlordId], references: [id])
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  lease         Lease           @relation(fields: [leaseId], references: [id])
+  property      Property        @relation(fields: [propertyId], references: [id])
+  unit          Unit            @relation(fields: [unitId], references: [id])
+  invoice       Invoice?        @relation(fields: [invoiceId], references: [id])
+  method        PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
+  receipt       Receipt?
+  paymentProofs PaymentProof[]
+}
+
+model Receipt {
+  id        String   @id @default(cuid())
+  paymentId String   @unique
+  fileUrl   String?
+  receiptNo String   @unique
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+}
+
+model PaymentProof {
+  id         String   @id @default(cuid())
+  paymentId  String
+  fileUrl    String
+  fileType   String?
+  uploadedAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+}
+
+model PaymentMethod {
+  id          String            @id @default(cuid())
+  landlordId  String
+  type        PaymentMethodType
+  label       String
+  details     Json?
+  isDefault   Boolean           @default(false)
+  status      RecordStatus      @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  archivedAt  DateTime?
+  archivedBy  String?
+
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+  payments Payment[]
+
+  @@index([landlordId, type])
+  @@index([landlordId, status])
+}
+
+model BankAccount {
+  id                  String       @id @default(cuid())
+  landlordId          String
+  bankName            String
+  accountName         String?
+  accountNumberMasked String
+  branch              String?
+  swiftCode           String?
+  routingInfo         String?
+  isDefault           Boolean      @default(false)
+  status              RecordStatus @default(ACTIVE)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  archivedAt          DateTime?
+  archivedBy          String?
+
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+
+  @@index([landlordId, status])
 }
 
 model Expense {

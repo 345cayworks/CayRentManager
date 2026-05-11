@@ -2,9 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { LeaseStatus, MaintenanceStatus, PaymentMethodType, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
+import { LeaseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PaymentMethodType, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
-import { requireLandlordAccess, getCurrentLandlordWorkspace, requireRole, requireSuperadmin } from '@/lib/auth/guards';
+import { getCurrentLandlordWorkspace, requireRole, requireSuperadmin } from '@/lib/auth/guards';
 import { requireOwnedLease, requireOwnedProperty, requireOwnedTenant, requireOwnedUnit } from '@/lib/auth/ownership';
 import { createInvoiceForLease, applyPaymentToInvoice, generateReceiptForPayment } from '@/lib/payments/invoices';
 import { registerPublicLandlord } from '@/lib/services/registration';
@@ -60,6 +60,11 @@ function maskAccountNumber(accountNumber: string) {
   const clean = accountNumber.replace(/\s+/g, '');
   if (clean.length <= 4) return clean;
   return `${'*'.repeat(Math.max(0, clean.length - 4))}${clean.slice(-4)}`;
+}
+
+function validEnumValue<T extends Record<string, string>>(enumObject: T, value: string, label: string) {
+  if (!Object.values(enumObject).includes(value)) throw new Error(`Invalid ${label}.`);
+  return value as T[keyof T];
 }
 
 export async function registerLandlordAction(formData: FormData) {
@@ -158,6 +163,179 @@ export async function createLeaseAction(formData: FormData) {
   });
   await audit(user.userId, user.email, 'lease.created', 'Lease', lease.id, landlordId);
   revalidatePath('/leases');
+  revalidatePath('/dashboard');
+}
+
+export async function createTenantMaintenanceRequestAction(formData: FormData) {
+  const user = await requireRole([UserRole.TENANT, UserRole.SUPERADMIN]);
+  const tenant = await prisma.tenant.findFirst({
+    where: user.role === UserRole.SUPERADMIN ? { id: requiredText(formData, 'tenantId') } : { userId: user.userId },
+    include: { leases: { where: { status: LeaseStatus.ACTIVE }, orderBy: { createdAt: 'desc' } } },
+  });
+  if (!tenant) throw new Error('Tenant profile not found.');
+
+  const lease = tenant.leases[0];
+  const propertyId = text(formData, 'propertyId') || lease?.propertyId;
+  const unitId = text(formData, 'unitId') || lease?.unitId || null;
+  if (!propertyId) throw new Error('A property is required for maintenance requests.');
+
+  const category = validEnumValue(MaintenanceCategory, text(formData, 'category') || MaintenanceCategory.GENERAL, 'maintenance category');
+  const priority = validEnumValue(MaintenancePriority, text(formData, 'priority') || MaintenancePriority.MEDIUM, 'maintenance priority');
+
+  const request = await prisma.maintenanceRequest.create({
+    data: {
+      landlordId: tenant.landlordId,
+      tenantId: tenant.id,
+      propertyId,
+      unitId,
+      title: requiredText(formData, 'title'),
+      description: requiredText(formData, 'description'),
+      category,
+      priority,
+      permissionToEnter: text(formData, 'permissionToEnter') === 'on',
+      preferredContactTime: text(formData, 'preferredContactTime') || null,
+      photoUrl: text(formData, 'photoUrl') || null,
+    },
+  });
+
+  const attachmentUrl = text(formData, 'attachmentUrl');
+  if (attachmentUrl) {
+    await prisma.maintenanceAttachment.create({
+      data: {
+        maintenanceRequestId: request.id,
+        fileUrl: attachmentUrl,
+        fileType: text(formData, 'attachmentType') || null,
+      },
+    });
+  }
+
+  await audit(user.userId, user.email, 'maintenance.created', 'MaintenanceRequest', request.id, tenant.landlordId, { category, priority });
+  revalidatePath('/tenant/maintenance');
+  revalidatePath('/maintenance');
+  revalidatePath('/dashboard');
+}
+
+export async function addMaintenanceAttachmentAction(formData: FormData) {
+  const user = await requireRole([UserRole.TENANT, UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.SUPERADMIN]);
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const request = await prisma.maintenanceRequest.findFirst({
+    where: user.role === UserRole.TENANT
+      ? { id: maintenanceRequestId, tenant: { userId: user.userId } }
+      : { id: maintenanceRequestId },
+  });
+  if (!request) throw new Error('Maintenance request not found.');
+
+  if (user.role !== UserRole.TENANT && user.role !== UserRole.SUPERADMIN) {
+    await requireOwnedProperty(request.landlordId, request.propertyId);
+  }
+
+  const attachment = await prisma.maintenanceAttachment.create({
+    data: {
+      maintenanceRequestId,
+      fileUrl: requiredText(formData, 'fileUrl'),
+      fileType: text(formData, 'fileType') || null,
+    },
+  });
+  await audit(user.userId, user.email, 'maintenance.attachment_added', 'MaintenanceAttachment', attachment.id, request.landlordId, { maintenanceRequestId });
+  revalidatePath('/tenant/maintenance');
+  revalidatePath('/maintenance');
+}
+
+export async function addMaintenanceCommentAction(formData: FormData) {
+  const user = await requireRole([UserRole.TENANT, UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.MAINTENANCE_PROVIDER, UserRole.SUPERADMIN]);
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const request = await prisma.maintenanceRequest.findFirst({
+    where: user.role === UserRole.TENANT
+      ? { id: maintenanceRequestId, tenant: { userId: user.userId } }
+      : { id: maintenanceRequestId },
+  });
+  if (!request) throw new Error('Maintenance request not found.');
+
+  const comment = await prisma.maintenanceComment.create({
+    data: {
+      maintenanceRequestId,
+      authorUserId: user.userId,
+      message: requiredText(formData, 'message'),
+    },
+  });
+  await audit(user.userId, user.email, 'maintenance.comment_added', 'MaintenanceComment', comment.id, request.landlordId, { maintenanceRequestId });
+  revalidatePath('/tenant/maintenance');
+  revalidatePath('/maintenance');
+}
+
+export async function createMaintenanceVendorAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendor = await prisma.maintenanceVendor.create({
+    data: {
+      landlordId,
+      name: requiredText(formData, 'name'),
+      email: text(formData, 'email') || null,
+      phone: text(formData, 'phone') || null,
+      specialty: text(formData, 'specialty') || null,
+      approvedStatus: text(formData, 'approvedStatus') === 'on',
+      notes: text(formData, 'notes') || null,
+    },
+  });
+  await audit(user.userId, user.email, 'maintenance_vendor.created', 'MaintenanceVendor', vendor.id, landlordId);
+  revalidatePath('/maintenance/vendors');
+  revalidatePath('/maintenance');
+}
+
+export async function assignMaintenanceVendorAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const vendorId = requiredText(formData, 'vendorId');
+
+  const vendor = await prisma.maintenanceVendor.findFirst({ where: { id: vendorId, landlordId } });
+  if (!vendor) throw new Error('Vendor not found for this workspace.');
+
+  const result = await prisma.maintenanceRequest.updateMany({
+    where: { id: maintenanceRequestId, landlordId },
+    data: { assignedVendorId: vendorId, status: MaintenanceStatus.IN_PROGRESS },
+  });
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'maintenance.vendor_assigned', 'MaintenanceRequest', maintenanceRequestId, landlordId, { vendorId });
+  revalidatePath('/maintenance');
+}
+
+export async function createMaintenanceWorkOrderAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const request = await prisma.maintenanceRequest.findFirst({ where: { id: maintenanceRequestId, landlordId } });
+  if (!request) throw new Error('Maintenance request not found for this workspace.');
+
+  const vendorId = text(formData, 'vendorId') || null;
+  if (vendorId) {
+    const vendor = await prisma.maintenanceVendor.findFirst({ where: { id: vendorId, landlordId } });
+    if (!vendor) throw new Error('Vendor not found for this workspace.');
+  }
+
+  const workOrder = await prisma.maintenanceWorkOrder.create({
+    data: {
+      maintenanceRequestId,
+      vendorId,
+      status: text(formData, 'status') || 'OPEN',
+      estimatedCost: text(formData, 'estimatedCost') ? positiveNumber(text(formData, 'estimatedCost'), 'Estimated cost') : null,
+      scheduledDate: text(formData, 'scheduledDate') ? new Date(text(formData, 'scheduledDate')) : null,
+      notes: text(formData, 'notes') || null,
+    },
+  });
+  await audit(user.userId, user.email, 'maintenance_work_order.created', 'MaintenanceWorkOrder', workOrder.id, landlordId, { maintenanceRequestId, vendorId });
+  revalidatePath('/maintenance');
+}
+
+export async function updateMaintenanceStatusAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const status = validEnumValue(MaintenanceStatus, requiredText(formData, 'status'), 'maintenance status');
+  const result = await prisma.maintenanceRequest.updateMany({
+    where: { id: maintenanceRequestId, landlordId },
+    data: { status },
+  });
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'maintenance.status_updated', 'MaintenanceRequest', maintenanceRequestId, landlordId, { status });
+  revalidatePath('/maintenance');
+  revalidatePath('/tenant/maintenance');
   revalidatePath('/dashboard');
 }
 

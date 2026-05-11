@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { UserRole } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { requireRole } from '@/lib/auth/guards';
@@ -211,7 +212,7 @@ export default async function Page() {
                         <td className="p-3">{payment.property.name} / {payment.unit.unitName}</td>
                         <td className="p-3 text-right">{money(payment.amountPaid)}</td>
                         <td className="p-3">{payment.paymentMethod ?? '—'}</td>
-                        <td className="p-3">{payment.receipt?.receiptNo ?? 'Pending'}</td>
+                        <td className="p-3">{payment.receipt ? <Link className="text-brand-navy underline" href={`/api/receipts/${payment.receipt.id}`} target="_blank">{payment.receipt.receiptNo}</Link> : 'Pending'}</td>
                         <td className="p-3">{payment.paymentProofs.length}</td>
                       </tr>
                     ))}

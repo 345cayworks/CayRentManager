@@ -185,16 +185,14 @@ export default function HomePage() {
               <div className="rounded-xl bg-slate-50 p-4">Early access for landlords, property managers, and portfolio operators</div>
             </div>
           </div>
-          <form name="demo-request" method="POST" data-netlify="true" netlify-honeypot="bot-field" className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-            <input type="hidden" name="form-name" value="demo-request" />
-            <p className="hidden"><label>Do not fill this out: <input name="bot-field" /></label></p>
+          <form className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
             <input name="fullName" placeholder="Full name" className="min-h-12 rounded-xl border border-slate-200 px-4 py-3" />
             <input name="email" placeholder="Email address" type="email" className="min-h-12 rounded-xl border border-slate-200 px-4 py-3" />
             <input name="phone" placeholder="Phone / WhatsApp" className="min-h-12 rounded-xl border border-slate-200 px-4 py-3" />
             <input name="company" placeholder="Company or portfolio name" className="min-h-12 rounded-xl border border-slate-200 px-4 py-3" />
             <textarea name="message" placeholder="Tell us about your properties" rows={4} className="rounded-xl border border-slate-200 px-4 py-3" />
-            <button type="submit" className="min-h-12 rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white">Request demo</button>
-            <p className="text-xs leading-5 text-slate-500">Demo requests are captured securely through the site form.</p>
+            <button type="button" className="min-h-12 rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white">Request demo</button>
+            <p className="text-xs leading-5 text-slate-500">Lead capture wiring can be connected in the next sprint through a server action or CRM endpoint.</p>
           </form>
         </div>
       </section>

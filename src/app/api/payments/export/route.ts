@@ -4,6 +4,8 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { landlordId } = await getCurrentLandlordWorkspace();

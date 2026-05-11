@@ -100,11 +100,22 @@ export async function getUserLandlordMemberships(userId?: string) {
 }
 
 export async function requireLandlordAccess(landlordId: string) {
-  const user = await requireRole([UserRole.SUPERADMIN, UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.ACCOUNTANT]);
+  const user = await requireRole([
+    UserRole.SUPERADMIN,
+    UserRole.LANDLORD,
+    UserRole.PROPERTY_MANAGER,
+    UserRole.ACCOUNTANT,
+  ]);
+
   if (user.role === UserRole.SUPERADMIN) return user;
 
   const membership = await prisma.landlordMembership.findFirst({
-    where: { landlordId, userId: user.userId, status: 'ACTIVE', landlord: { status: 'ACTIVE' } },
+    where: {
+      landlordId,
+      userId: user.userId,
+      status: 'ACTIVE',
+      landlord: { status: 'ACTIVE' },
+    },
   });
 
   if (!membership) redirect('/unauthorized');
@@ -124,9 +135,20 @@ export async function requireTenantAccess(tenantId: string) {
 }
 
 export async function getCurrentLandlordWorkspace() {
-  const user = await requireRole([UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.ACCOUNTANT]);
+  const user = await requireRole([
+    UserRole.LANDLORD,
+    UserRole.PROPERTY_MANAGER,
+    UserRole.ACCOUNTANT,
+  ]);
+
   const memberships = await getUserLandlordMemberships(user.userId);
   const active = getActiveLandlordWorkspace(memberships.map((membership) => membership.landlordId));
+
   if (!active) redirect('/register?error=no-workspace');
-  return { user, landlordId: active, membership: memberships.find((membership) => membership.landlordId === active)! };
+
+  return {
+    user,
+    landlordId: active,
+    membership: memberships.find((membership) => membership.landlordId === active)!,
+  };
 }

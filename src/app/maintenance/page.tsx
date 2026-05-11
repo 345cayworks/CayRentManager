@@ -1,4 +1,5 @@
-import { MaintenanceStatus } from '@prisma/client';
+import Link from 'next/link';
+import { MaintenancePriority, MaintenanceStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
@@ -12,16 +13,53 @@ function badge(value: string) {
   return <span className="inline-flex rounded-full border bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">{value.replaceAll('_', ' ')}</span>;
 }
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: {
+    q?: string;
+    priority?: string;
+    vendor?: string;
+    property?: string;
+  };
+}) {
   const { landlordId } = await getCurrentLandlordWorkspace();
 
-  const [requests, vendors] = await Promise.all([
+  const search = searchParams?.q?.trim() ?? '';
+  const priority = searchParams?.priority ?? '';
+  const vendor = searchParams?.vendor ?? '';
+  const property = searchParams?.property ?? '';
+
+  const [requests, vendors, properties] = await Promise.all([
     prisma.maintenanceRequest.findMany({
-      where: { landlordId, status: { not: MaintenanceStatus.ARCHIVED } },
-      include: { tenant: true, property: true, unit: true, vendor: true, attachments: true, comments: true, workOrders: true },
+      where: {
+        landlordId,
+        status: { not: MaintenanceStatus.ARCHIVED },
+        ...(search
+          ? {
+              OR: [
+                { title: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+        ...(priority ? { priority: priority as MaintenancePriority } : {}),
+        ...(vendor ? { assignedVendorId: vendor } : {}),
+        ...(property ? { propertyId: property } : {}),
+      },
+      include: {
+        tenant: true,
+        property: true,
+        unit: true,
+        vendor: true,
+        attachments: true,
+        comments: true,
+        workOrders: true,
+      },
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     }),
     prisma.maintenanceVendor.findMany({ where: { landlordId }, orderBy: { name: 'asc' } }),
+    prisma.property.findMany({ where: { landlordId }, orderBy: { name: 'asc' } }),
   ]);
 
   return (
@@ -32,6 +70,31 @@ export default async function Page() {
           return <div key={status} className="rounded-xl bg-white border shadow-sm p-4"><p className="text-slate-500">{status.replaceAll('_', ' ')}</p><p className="text-2xl font-semibold">{count}</p></div>;
         })}
       </div>
+
+      <section className="rounded-xl bg-white border shadow-sm p-4 mb-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="font-semibold">Search & Filters</h3>
+            <p className="text-sm text-slate-500 mt-1">Quickly find requests by keyword, priority, vendor, or property.</p>
+          </div>
+          <form className="grid gap-3 md:grid-cols-4 lg:min-w-[760px]">
+            <input name="q" defaultValue={search} placeholder="Search requests" className="border rounded px-3 py-2 text-sm" />
+            <select name="priority" defaultValue={priority} className="border rounded px-3 py-2 text-sm">
+              <option value="">All priorities</option>
+              {Object.values(MaintenancePriority).map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}
+            </select>
+            <select name="vendor" defaultValue={vendor} className="border rounded px-3 py-2 text-sm">
+              <option value="">All vendors</option>
+              {vendors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <select name="property" defaultValue={property} className="border rounded px-3 py-2 text-sm">
+              <option value="">All properties</option>
+              {properties.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <button className="rounded bg-brand-navy text-white px-4 py-2 text-sm md:col-span-4">Apply filters</button>
+          </form>
+        </div>
+      </section>
 
       <section className="rounded-xl bg-white border shadow-sm p-4 mb-6">
         <h3 className="font-semibold">Vendor Management</h3>
@@ -75,6 +138,10 @@ export default async function Page() {
                     {request.attachments.length} files · {request.comments.length} comments · {request.workOrders.length} work orders
                   </div>
                   <div className="text-sm text-slate-600">Vendor: {request.vendor?.name ?? 'Not assigned'}</div>
+
+                  <Link href={`/maintenance/${request.id}`} className="inline-flex w-full items-center justify-center rounded border border-brand-navy px-3 py-2 text-sm font-medium text-brand-navy hover:bg-slate-50">
+                    Open request
+                  </Link>
 
                   <form action={updateMaintenanceStatusAction} className="grid gap-2">
                     <input type="hidden" name="maintenanceRequestId" value={request.id} />

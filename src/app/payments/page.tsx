@@ -217,7 +217,7 @@ export default async function Page() {
                     <td className="p-3 text-right">{money(payment.amountPaid)}</td>
                     <td className="p-3 text-right">{money(payment.balance)}</td>
                     <td className="p-3">{statusBadge(payment.status)}</td>
-                    <td className="p-3">{payment.receipt ? payment.receipt.receiptNo : '—'}</td>
+                    <td className="p-3">{payment.receipt ? <Link className="text-brand-navy underline" href={`/api/receipts/${payment.receipt.id}`} target="_blank">{payment.receipt.receiptNo}</Link> : '—'}</td>
                     <td className="p-3 flex gap-2">
                       {!payment.receipt && (
                         <form action={generateReceiptAction} className="inline">

@@ -11,6 +11,13 @@ import { acceptTenantInvitation, createTenantInvitation } from '@/lib/services/i
 import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 import { calculatePaymentBalance, calculatePaymentStatus, validatePaymentDates } from '@/lib/validation/payments';
 
+const operationalRoles: UserRole[] = [
+  UserRole.VENDOR,
+  UserRole.MAINTENANCE_PROVIDER,
+  UserRole.CONCIERGE_AGENT,
+  UserRole.GUEST,
+];
+
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
 }
@@ -311,7 +318,7 @@ export async function assignUserRoleAction(formData: FormData) {
     throw new Error('Assign a landlord workspace membership before assigning this role.');
   }
 
-  if ([UserRole.VENDOR, UserRole.MAINTENANCE_PROVIDER, UserRole.CONCIERGE_AGENT, UserRole.GUEST].includes(role) && target.memberships.length > 0) {
+  if (operationalRoles.includes(role) && target.memberships.length > 0) {
     throw new Error('Operational roles should not have landlord workspace memberships in Phase 1.');
   }
 

@@ -14,6 +14,11 @@ function badge(value: string) {
   return <span className="inline-flex rounded-full border bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">{value.replaceAll('_', ' ')}</span>;
 }
 
+function formatMoney(value: unknown) {
+  if (value === null || value === undefined) return 'Not provided';
+  return `$${Number(value).toFixed(2)}`;
+}
+
 export default async function Page({ params }: { params: { maintenanceId: string } }) {
   const { landlordId } = await getCurrentLandlordWorkspace();
 
@@ -112,7 +117,7 @@ export default async function Page({ params }: { params: { maintenanceId: string
               {request.workOrders.map((order) => (
                 <div key={order.id} className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-700">
                   <div className="flex flex-wrap gap-2">{badge(order.status)}{order.vendor ? badge(order.vendor.name) : null}</div>
-                  <p className="mt-2">Estimated cost: {order.estimatedCost ?? 'Not provided'}</p>
+                  <p className="mt-2">Estimated cost: {formatMoney(order.estimatedCost)}</p>
                   <p>Scheduled: {order.scheduledDate ? order.scheduledDate.toLocaleDateString() : 'Not scheduled'}</p>
                   {order.notes ? <p className="mt-2 whitespace-pre-line">{order.notes}</p> : null}
                 </div>

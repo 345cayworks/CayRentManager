@@ -22,10 +22,13 @@ const landlordLinks = [
 
 const tenantLinks = [['/tenant/dashboard', 'Dashboard']];
 
+const operationalLinks = [['/unauthorized', 'Access Pending']];
+
 function linksForRole(role?: UserRole) {
   if (role === UserRole.SUPERADMIN) return adminLinks;
   if (role === UserRole.TENANT) return tenantLinks;
   if (role === UserRole.LANDLORD || role === UserRole.PROPERTY_MANAGER || role === UserRole.ACCOUNTANT) return landlordLinks;
+  if (role === UserRole.VENDOR || role === UserRole.MAINTENANCE_PROVIDER || role === UserRole.CONCIERGE_AGENT || role === UserRole.GUEST) return operationalLinks;
   return [];
 }
 

@@ -18,7 +18,12 @@ function getRoleDisplay(role: UserRole): string {
     TENANT: 'Tenant',
     PROPERTY_MANAGER: 'Property Manager',
     ACCOUNTANT: 'Accountant',
+    VENDOR: 'Vendor',
+    MAINTENANCE_PROVIDER: 'Maintenance Provider',
+    CONCIERGE_AGENT: 'Concierge Agent',
+    GUEST: 'Guest',
   };
+
   return roleMap[role] || role;
 }
 
@@ -28,30 +33,24 @@ export function SignOutPanel({ email, role, name }: SignOutPanelProps) {
 
   const handleSignOut = async () => {
     setIsLoading(true);
+
     try {
-      // Try to logout from Netlify Identity
       try {
         await logout();
       } catch (err) {
         console.warn('Netlify logout failed, continuing with app logout:', err);
       }
 
-      // Call the server-side logout endpoint
       const response = await fetch('/api/identity/logout', { method: 'POST' });
 
       if (!response.ok) {
         console.warn('App logout returned status:', response.status);
-        // Continue to redirect even if logout fails
       }
 
-      // Refresh the router to clear any cached session data
       router.refresh();
-
-      // Navigate to login
       router.push('/login');
     } catch (error) {
       console.error('Sign out error:', error);
-      // Still redirect to login even if there's an error
       router.push('/login');
     }
   };
@@ -60,12 +59,20 @@ export function SignOutPanel({ email, role, name }: SignOutPanelProps) {
     <div className="border-t border-white/20 pt-4 mt-auto">
       <div className="text-xs text-white/70 space-y-1 mb-3">
         <p className="font-medium text-white/80">Signed in as</p>
+
         <p className="truncate" title={email}>
           {email}
         </p>
+
         <p className="text-white/60">{getRoleDisplay(role)}</p>
-        {name && <p className="text-white/60 truncate" title={name}>{name}</p>}
+
+        {name && (
+          <p className="text-white/60 truncate" title={name}>
+            {name}
+          </p>
+        )}
       </div>
+
       <button
         onClick={handleSignOut}
         disabled={isLoading}

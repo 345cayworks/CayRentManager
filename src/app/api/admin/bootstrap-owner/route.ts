@@ -15,6 +15,26 @@ function timingSafeEquals(left: string, right: string) {
   return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+function bootstrapEnabled() {
+  return process.env.ENABLE_BOOTSTRAP_OWNER_ROUTE === 'true';
+}
+
+function isAllowedIp(request: Request) {
+  const allowedIps = (process.env.BOOTSTRAP_ALLOWED_IPS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (allowedIps.length === 0) return true;
+
+  const forwardedFor = request.headers.get('x-forwarded-for') ?? '';
+  const requestIp = forwardedFor.split(',')[0]?.trim();
+
+  if (!requestIp) return false;
+
+  return allowedIps.includes(requestIp);
+}
+
 async function writeBootstrapAudit(user: { id: string; email: string }) {
   try {
     await prisma.auditLog.create({
@@ -33,6 +53,14 @@ async function writeBootstrapAudit(user: { id: string; email: string }) {
 }
 
 export async function POST(request: Request) {
+  if (!bootstrapEnabled()) {
+    return NextResponse.json({ ok: false }, { status: 404 });
+  }
+
+  if (!isAllowedIp(request)) {
+    return NextResponse.json({ ok: false }, { status: 403 });
+  }
+
   const configuredEmail = normalizeEmail(process.env.SUPER_ADMIN_EMAIL ?? '');
   const configuredMasterKey = process.env.SUPERADMIN_MASTER_KEY ?? '';
 

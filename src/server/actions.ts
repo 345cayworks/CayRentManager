@@ -6,6 +6,7 @@ import { LeaseStatus, MaintenanceStatus, PaymentStatus, RecordStatus, UserRole, 
 import { prisma } from '@/lib/db/prisma';
 import { requireLandlordAccess, getCurrentLandlordWorkspace, requireSuperadmin } from '@/lib/auth/guards';
 import { requireOwnedLease, requireOwnedProperty, requireOwnedTenant, requireOwnedUnit } from '@/lib/auth/ownership';
+import { createInvoiceForLease, applyPaymentToInvoice, generateReceiptForPayment } from '@/lib/payments/invoices';
 import { registerPublicLandlord } from '@/lib/services/registration';
 import { acceptTenantInvitation, createTenantInvitation } from '@/lib/services/invitations';
 import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
@@ -152,6 +153,61 @@ export async function createLeaseAction(formData: FormData) {
   await audit(user.userId, user.email, 'lease.created', 'Lease', lease.id, landlordId);
   revalidatePath('/leases');
   revalidatePath('/dashboard');
+}
+
+export async function createInvoiceAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const leaseId = requiredText(formData, 'leaseId');
+  await requireOwnedLease(landlordId, leaseId);
+
+  const invoice = await createInvoiceForLease({
+    landlordId,
+    leaseId,
+    dueDate: new Date(requiredText(formData, 'dueDate')),
+    amount: positiveNumber(money(formData, 'amount'), 'Invoice amount'),
+    notes: text(formData, 'notes') || undefined,
+  });
+
+  await audit(user.userId, user.email, 'invoice.created', 'Invoice', invoice.id, landlordId, { invoiceNo: invoice.invoiceNo });
+  revalidatePath('/payments');
+  revalidatePath('/dashboard');
+}
+
+export async function recordInvoicePaymentAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const invoiceId = requiredText(formData, 'invoiceId');
+  const amountPaid = positiveNumber(money(formData, 'amountPaid'), 'Payment amount');
+
+  const result = await applyPaymentToInvoice({
+    landlordId,
+    invoiceId,
+    amountPaid,
+    paymentDate: text(formData, 'paymentDate') ? new Date(text(formData, 'paymentDate')) : new Date(),
+    paymentMethod: text(formData, 'paymentMethod') || null,
+    paymentMethodId: text(formData, 'paymentMethodId') || null,
+    notes: text(formData, 'notes') || null,
+  });
+
+  const receipt = await generateReceiptForPayment({ paymentId: result.payment.id });
+
+  await audit(user.userId, user.email, 'invoice.payment_recorded', 'Payment', result.payment.id, landlordId, {
+    invoiceId,
+    receiptId: receipt.id,
+  });
+
+  revalidatePath('/payments');
+  revalidatePath('/dashboard');
+}
+
+export async function generateReceiptAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const paymentId = requiredText(formData, 'paymentId');
+  const payment = await prisma.payment.findFirst({ where: { id: paymentId, landlordId } });
+  if (!payment) throw new Error('Payment not found for this workspace.');
+
+  const receipt = await generateReceiptForPayment({ paymentId });
+  await audit(user.userId, user.email, 'receipt.generated', 'Receipt', receipt.id, landlordId, { paymentId });
+  revalidatePath('/payments');
 }
 
 export async function recordPaymentAction(formData: FormData) {

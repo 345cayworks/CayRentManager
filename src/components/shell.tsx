@@ -17,10 +17,17 @@ const landlordLinks = [
   ['/tenants', 'Tenants'],
   ['/leases', 'Leases'],
   ['/payments', 'Payments'],
+  ['/payments/settings', 'Payment Settings'],
+  ['/maintenance', 'Maintenance'],
   ['/expenses', 'Expenses'],
+  ['/documents', 'Documents'],
+  ['/reports', 'Reports'],
 ];
 
-const tenantLinks = [['/tenant/dashboard', 'Dashboard']];
+const tenantLinks = [
+  ['/tenant/dashboard', 'Dashboard'],
+  ['/tenant/maintenance', 'Maintenance'],
+];
 
 const operationalLinks = [['/unauthorized', 'Access Pending']];
 

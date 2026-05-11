@@ -20,15 +20,38 @@ export default async function VendorsPage() {
   const vendors = await prisma.maintenanceVendor.findMany({
     where: { landlordId },
     include: {
-      maintenanceRequests: true,
-      workOrders: true,
+      _count: {
+        select: {
+          workOrders: true,
+        },
+      },
     },
     orderBy: { name: 'asc' },
   });
 
+  const requestCounts = await prisma.maintenanceRequest.groupBy({
+    by: ['assignedVendorId'],
+    where: {
+      landlordId,
+      assignedVendorId: {
+        not: null,
+      },
+    },
+    _count: {
+      assignedVendorId: true,
+    },
+  });
+
+  const requestCountMap = new Map(
+    requestCounts.map((item) => [item.assignedVendorId, item._count.assignedVendorId])
+  );
+
   const approvedCount = vendors.filter((vendor) => vendor.approvedStatus).length;
-  const activeAssignments = vendors.reduce((sum, vendor) => sum + vendor.maintenanceRequests.length, 0);
-  const workOrders = vendors.reduce((sum, vendor) => sum + vendor.workOrders.length, 0);
+  const activeAssignments = vendors.reduce(
+    (sum, vendor) => sum + (requestCountMap.get(vendor.id) ?? 0),
+    0
+  );
+  const workOrders = vendors.reduce((sum, vendor) => sum + vendor._count.workOrders, 0);
 
   return (
     <Shell title="Vendor Directory">
@@ -93,8 +116,8 @@ export default async function VendorsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-4 text-slate-700">{vendor.maintenanceRequests.length}</td>
-                  <td className="px-4 py-4 text-slate-700">{vendor.workOrders.length}</td>
+                  <td className="px-4 py-4 text-slate-700">{requestCountMap.get(vendor.id) ?? 0}</td>
+                  <td className="px-4 py-4 text-slate-700">{vendor._count.workOrders}</td>
                   <td className="px-4 py-4 text-slate-600 max-w-xs whitespace-pre-line">
                     {vendor.notes || '—'}
                   </td>

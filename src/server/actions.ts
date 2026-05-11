@@ -2,10 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { LeaseStatus, MaintenanceStatus, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
+import { LeaseStatus, MaintenanceStatus, PaymentMethodType, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
-import { requireLandlordAccess, getCurrentLandlordWorkspace, requireSuperadmin } from '@/lib/auth/guards';
+import { requireLandlordAccess, getCurrentLandlordWorkspace, requireRole, requireSuperadmin } from '@/lib/auth/guards';
 import { requireOwnedLease, requireOwnedProperty, requireOwnedTenant, requireOwnedUnit } from '@/lib/auth/ownership';
+import { createInvoiceForLease, applyPaymentToInvoice, generateReceiptForPayment } from '@/lib/payments/invoices';
 import { registerPublicLandlord } from '@/lib/services/registration';
 import { acceptTenantInvitation, createTenantInvitation } from '@/lib/services/invitations';
 import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
@@ -53,6 +54,12 @@ async function audit(actorUserId: string, actorEmail: string, action: string, en
 
 function assertSingleWorkspaceUpdate(result: { count: number }) {
   if (result.count !== 1) throw new Error('Record not found for this workspace.');
+}
+
+function maskAccountNumber(accountNumber: string) {
+  const clean = accountNumber.replace(/\s+/g, '');
+  if (clean.length <= 4) return clean;
+  return `${'*'.repeat(Math.max(0, clean.length - 4))}${clean.slice(-4)}`;
 }
 
 export async function registerLandlordAction(formData: FormData) {
@@ -154,6 +161,127 @@ export async function createLeaseAction(formData: FormData) {
   revalidatePath('/dashboard');
 }
 
+export async function createInvoiceAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const leaseId = requiredText(formData, 'leaseId');
+  await requireOwnedLease(landlordId, leaseId);
+
+  const invoice = await createInvoiceForLease({
+    landlordId,
+    leaseId,
+    dueDate: new Date(requiredText(formData, 'dueDate')),
+    amount: positiveNumber(money(formData, 'amount'), 'Invoice amount'),
+    notes: text(formData, 'notes') || undefined,
+  });
+
+  await audit(user.userId, user.email, 'invoice.created', 'Invoice', invoice.id, landlordId, { invoiceNo: invoice.invoiceNo });
+  revalidatePath('/payments');
+  revalidatePath('/tenant/dashboard');
+  revalidatePath('/dashboard');
+}
+
+export async function recordInvoicePaymentAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const invoiceId = requiredText(formData, 'invoiceId');
+  const amountPaid = positiveNumber(money(formData, 'amountPaid'), 'Payment amount');
+
+  const result = await applyPaymentToInvoice({
+    landlordId,
+    invoiceId,
+    amountPaid,
+    paymentDate: text(formData, 'paymentDate') ? new Date(text(formData, 'paymentDate')) : new Date(),
+    paymentMethod: text(formData, 'paymentMethod') || null,
+    paymentMethodId: text(formData, 'paymentMethodId') || null,
+    notes: text(formData, 'notes') || null,
+  });
+
+  const receipt = await generateReceiptForPayment({ paymentId: result.payment.id });
+
+  await audit(user.userId, user.email, 'invoice.payment_recorded', 'Payment', result.payment.id, landlordId, {
+    invoiceId,
+    receiptId: receipt.id,
+  });
+
+  revalidatePath('/payments');
+  revalidatePath('/tenant/dashboard');
+  revalidatePath('/dashboard');
+}
+
+export async function generateReceiptAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const paymentId = requiredText(formData, 'paymentId');
+  const payment = await prisma.payment.findFirst({ where: { id: paymentId, landlordId } });
+  if (!payment) throw new Error('Payment not found for this workspace.');
+
+  const receipt = await generateReceiptForPayment({ paymentId });
+  await audit(user.userId, user.email, 'receipt.generated', 'Receipt', receipt.id, landlordId, { paymentId });
+  revalidatePath('/payments');
+  revalidatePath('/tenant/dashboard');
+}
+
+export async function uploadPaymentProofAction(formData: FormData) {
+  const user = await requireRole([UserRole.TENANT, UserRole.SUPERADMIN]);
+  const paymentId = requiredText(formData, 'paymentId');
+  const fileUrl = requiredText(formData, 'fileUrl');
+  const fileType = text(formData, 'fileType') || null;
+
+  const payment = await prisma.payment.findFirst({
+    where: user.role === UserRole.SUPERADMIN ? { id: paymentId } : { id: paymentId, tenant: { userId: user.userId } },
+  });
+
+  if (!payment) throw new Error('Payment not found for this tenant account.');
+
+  const proof = await prisma.paymentProof.create({
+    data: { paymentId, fileUrl, fileType },
+  });
+
+  await audit(user.userId, user.email, 'payment.proof_uploaded', 'PaymentProof', proof.id, payment.landlordId, { paymentId });
+  revalidatePath('/tenant/dashboard');
+  revalidatePath('/payments');
+}
+
+export async function createBankAccountAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const bankName = requiredText(formData, 'bankName');
+  const accountNumber = requiredText(formData, 'accountNumber');
+
+  const bankAccount = await prisma.bankAccount.create({
+    data: {
+      landlordId,
+      bankName,
+      accountName: text(formData, 'accountName') || null,
+      accountNumberMasked: maskAccountNumber(accountNumber),
+      branch: text(formData, 'branch') || null,
+      swiftCode: text(formData, 'swiftCode') || null,
+      routingInfo: text(formData, 'routingInfo') || null,
+      isDefault: text(formData, 'isDefault') === 'on',
+    },
+  });
+
+  await audit(user.userId, user.email, 'bank_account.created', 'BankAccount', bankAccount.id, landlordId, { bankName });
+  revalidatePath('/payments/settings');
+  revalidatePath('/tenant/dashboard');
+}
+
+export async function createPaymentMethodAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const type = requiredText(formData, 'type') as PaymentMethodType;
+  if (!Object.values(PaymentMethodType).includes(type)) throw new Error('Invalid payment method type.');
+
+  const method = await prisma.paymentMethod.create({
+    data: {
+      landlordId,
+      type,
+      label: requiredText(formData, 'label'),
+      details: text(formData, 'details') ? { notes: text(formData, 'details') } : undefined,
+      isDefault: text(formData, 'isDefault') === 'on',
+    },
+  });
+
+  await audit(user.userId, user.email, 'payment_method.created', 'PaymentMethod', method.id, landlordId, { type, label: method.label });
+  revalidatePath('/payments/settings');
+}
+
 export async function recordPaymentAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
   const leaseId = requiredText(formData, 'leaseId');
@@ -184,6 +312,7 @@ export async function recordPaymentAction(formData: FormData) {
   });
   await audit(user.userId, user.email, 'payment.recorded', 'Payment', payment.id, landlordId);
   revalidatePath('/payments');
+  revalidatePath('/tenant/dashboard');
   revalidatePath('/dashboard');
 }
 
@@ -426,6 +555,7 @@ export async function voidPaymentAction(formData: FormData) {
   assertSingleWorkspaceUpdate(result);
   await audit(user.userId, user.email, 'payment.voided', 'Payment', paymentId, landlordId);
   revalidatePath('/payments');
+  revalidatePath('/tenant/dashboard');
   revalidatePath('/dashboard');
 }
 

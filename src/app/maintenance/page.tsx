@@ -2,7 +2,7 @@ import { MaintenanceStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { assignMaintenanceVendorAction, createMaintenanceWorkOrderAction, updateMaintenanceStatusAction } from '@/server/actions';
+import { assignMaintenanceVendorAction, createMaintenanceVendorAction, createMaintenanceWorkOrderAction, updateMaintenanceStatusAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +32,27 @@ export default async function Page() {
           return <div key={status} className="rounded-xl bg-white border shadow-sm p-4"><p className="text-slate-500">{status.replaceAll('_', ' ')}</p><p className="text-2xl font-semibold">{count}</p></div>;
         })}
       </div>
+
+      <section className="rounded-xl bg-white border shadow-sm p-4 mb-6">
+        <h3 className="font-semibold">Vendor Management</h3>
+        <p className="text-sm text-slate-500 mt-1">Add contractors and service providers for assignment to maintenance requests.</p>
+        <form action={createMaintenanceVendorAction} className="grid gap-3 mt-4 md:grid-cols-5">
+          <input required name="name" placeholder="Vendor name" className="border rounded px-3 py-2" />
+          <input name="email" type="email" placeholder="Email" className="border rounded px-3 py-2" />
+          <input name="phone" placeholder="Phone" className="border rounded px-3 py-2" />
+          <input name="specialty" placeholder="Specialty" className="border rounded px-3 py-2" />
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input name="approvedStatus" type="checkbox" /> Approved
+          </label>
+          <textarea name="notes" placeholder="Vendor notes" className="border rounded px-3 py-2 md:col-span-4" rows={2} />
+          <button className="rounded bg-brand-navy text-white px-4 py-2">Save vendor</button>
+        </form>
+        <div className="mt-4 flex flex-wrap gap-2 text-sm text-slate-600">
+          <span>{vendors.length} vendors</span>
+          <span>·</span>
+          <span>{vendors.filter((vendor) => vendor.approvedStatus).length} approved</span>
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-4 items-start">
         {statuses.map((status) => (

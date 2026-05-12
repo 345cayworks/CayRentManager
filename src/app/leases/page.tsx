@@ -54,6 +54,22 @@ function alertBadge(severity: LeaseAlertSeverity) {
   return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${styles[severity]}`}>{severity}</span>;
 }
 
+function severityCard(label: LeaseAlertSeverity, count: number) {
+  const styles: Record<LeaseAlertSeverity, string> = {
+    CRITICAL: 'border-red-200 bg-red-50 text-red-700',
+    URGENT: 'border-orange-200 bg-orange-50 text-orange-700',
+    WARNING: 'border-amber-200 bg-amber-50 text-amber-700',
+    INFO: 'border-slate-200 bg-slate-50 text-slate-700',
+  };
+
+  return (
+    <div className={`rounded-2xl border p-4 ${styles[label]}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide">{label}</p>
+      <p className="mt-2 text-3xl font-black">{count}</p>
+    </div>
+  );
+}
+
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
 
@@ -109,6 +125,10 @@ export default async function Page() {
   const renewalPipeline = leases.filter((lease) => lease.renewals.length > 0);
   const alerts = buildLeaseAlertFeed({ leases, units, from: now, highBalanceThreshold: 1000 });
   const priorityAlerts = alerts.slice(0, 8);
+  const criticalAlerts = alerts.filter((alert) => alert.severity === 'CRITICAL').length;
+  const urgentAlerts = alerts.filter((alert) => alert.severity === 'URGENT').length;
+  const warningAlerts = alerts.filter((alert) => alert.severity === 'WARNING').length;
+  const infoAlerts = alerts.filter((alert) => alert.severity === 'INFO').length;
 
   return (
     <Shell title="Lease Operations">
@@ -120,9 +140,14 @@ export default async function Page() {
           </p>
         </div>
 
-        <Link href="/app" className="rounded border px-4 py-2 text-sm font-medium hover:bg-slate-50">
-          Back to dashboard
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/alerts" className="rounded bg-brand-navy px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+            Open Alert Center
+          </Link>
+          <Link href="/app" className="rounded border px-4 py-2 text-sm font-medium hover:bg-slate-50">
+            Back to dashboard
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-5 mb-8">
@@ -133,13 +158,22 @@ export default async function Page() {
         {statCard('Vacant units', vacantUnits.length)}
       </div>
 
+      <div className="grid gap-4 md:grid-cols-4 mb-8">
+        {severityCard('CRITICAL', criticalAlerts)}
+        {severityCard('URGENT', urgentAlerts)}
+        {severityCard('WARNING', warningAlerts)}
+        {severityCard('INFO', infoAlerts)}
+      </div>
+
       <section className="rounded-2xl border bg-white shadow-sm mb-8 overflow-hidden">
         <div className="border-b px-6 py-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="font-semibold text-lg">Operational Alerts</h3>
             <p className="text-sm text-slate-500 mt-1">Prioritized lease, renewal, notice, vacancy, and balance risks.</p>
           </div>
-          <span className="text-sm text-slate-500">{alerts.length} active alert(s)</span>
+          <Link href="/alerts" className="text-sm font-medium text-brand-navy hover:underline">
+            {alerts.length} active alert(s) · View all
+          </Link>
         </div>
 
         <div className="divide-y">

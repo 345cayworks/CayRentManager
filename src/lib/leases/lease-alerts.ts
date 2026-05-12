@@ -68,39 +68,38 @@ function severityForExpiration(daysRemaining: number): LeaseAlertSeverity {
 }
 
 export function getLeaseExpirationAlerts(leases: LeaseAlertLease[], from = new Date()): LeaseAlert[] {
-  return leases
-    .filter((lease) => lease.status === 'ACTIVE')
-    .map((lease) => {
-      const remaining = daysUntil(lease.endDate, from);
-      if (remaining > 90) return null;
+  return leases.flatMap((lease): LeaseAlert[] => {
+    if (lease.status !== 'ACTIVE') return [];
 
-      if (remaining < 0) {
-        return {
-          type: 'LEASE_EXPIRED' as const,
-          severity: 'CRITICAL' as const,
-          title: 'Active lease has expired',
-          description: `${leaseLabel(lease)} expired ${Math.abs(remaining)} day(s) ago but is still marked active.`,
-          leaseId: lease.id,
-          tenantId: lease.tenantId ?? undefined,
-          propertyId: lease.propertyId ?? undefined,
-          unitId: lease.unitId ?? undefined,
-          daysRemaining: remaining,
-        };
-      }
+    const remaining = daysUntil(lease.endDate, from);
+    if (remaining > 90) return [];
 
-      return {
-        type: 'LEASE_EXPIRING' as const,
-        severity: severityForExpiration(remaining),
-        title: `Lease expires in ${remaining} day(s)`,
-        description: `${leaseLabel(lease)} should be reviewed for renewal, notice, or turnover planning.`,
+    if (remaining < 0) {
+      return [{
+        type: 'LEASE_EXPIRED',
+        severity: 'CRITICAL',
+        title: 'Active lease has expired',
+        description: `${leaseLabel(lease)} expired ${Math.abs(remaining)} day(s) ago but is still marked active.`,
         leaseId: lease.id,
         tenantId: lease.tenantId ?? undefined,
         propertyId: lease.propertyId ?? undefined,
         unitId: lease.unitId ?? undefined,
         daysRemaining: remaining,
-      };
-    })
-    .filter((alert): alert is LeaseAlert => Boolean(alert));
+      }];
+    }
+
+    return [{
+      type: 'LEASE_EXPIRING',
+      severity: severityForExpiration(remaining),
+      title: `Lease expires in ${remaining} day(s)`,
+      description: `${leaseLabel(lease)} should be reviewed for renewal, notice, or turnover planning.`,
+      leaseId: lease.id,
+      tenantId: lease.tenantId ?? undefined,
+      propertyId: lease.propertyId ?? undefined,
+      unitId: lease.unitId ?? undefined,
+      daysRemaining: remaining,
+    }];
+  });
 }
 
 export function getRenewalAlerts(leases: LeaseAlertLease[], from = new Date()): LeaseAlert[] {

@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { LeaseStatus, RecordStatus } from '@prisma/client';
+import { LeaseStatus, PaymentStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { buildLeaseAlertFeed, type LeaseAlertSeverity } from '@/lib/leases/lease-alerts';
 import { createLeaseAction, expireLeaseAction, terminateLeaseAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,17 @@ function statusBadge(status: string) {
   );
 }
 
+function alertBadge(severity: LeaseAlertSeverity) {
+  const styles: Record<LeaseAlertSeverity, string> = {
+    CRITICAL: 'bg-red-100 text-red-700',
+    URGENT: 'bg-orange-100 text-orange-700',
+    WARNING: 'bg-amber-100 text-amber-700',
+    INFO: 'bg-slate-100 text-slate-700',
+  };
+
+  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${styles[severity]}`}>{severity}</span>;
+}
+
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
 
@@ -75,6 +87,15 @@ export default async function Page() {
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
+        notices: {
+          orderBy: { noticeDate: 'desc' },
+          take: 1,
+        },
+        payments: {
+          where: { status: { not: PaymentStatus.VOID } },
+          orderBy: { dueDate: 'desc' },
+          take: 12,
+        },
       },
       orderBy: { endDate: 'asc' },
     }),
@@ -86,6 +107,8 @@ export default async function Page() {
   const vacantUnits = units.filter((unit) => unit.leases.length === 0);
   const occupiedUnits = units.filter((unit) => unit.leases.length > 0);
   const renewalPipeline = leases.filter((lease) => lease.renewals.length > 0);
+  const alerts = buildLeaseAlertFeed({ leases, units, from: now, highBalanceThreshold: 1000 });
+  const priorityAlerts = alerts.slice(0, 8);
 
   return (
     <Shell title="Lease Operations">
@@ -109,6 +132,39 @@ export default async function Page() {
         {statCard('Occupied units', occupiedUnits.length)}
         {statCard('Vacant units', vacantUnits.length)}
       </div>
+
+      <section className="rounded-2xl border bg-white shadow-sm mb-8 overflow-hidden">
+        <div className="border-b px-6 py-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="font-semibold text-lg">Operational Alerts</h3>
+            <p className="text-sm text-slate-500 mt-1">Prioritized lease, renewal, notice, vacancy, and balance risks.</p>
+          </div>
+          <span className="text-sm text-slate-500">{alerts.length} active alert(s)</span>
+        </div>
+
+        <div className="divide-y">
+          {priorityAlerts.length === 0 ? (
+            <div className="p-6 text-sm text-slate-500">No operational lease alerts at this time.</div>
+          ) : (
+            priorityAlerts.map((alert, index) => (
+              <div key={`${alert.type}-${alert.leaseId ?? alert.unitId ?? index}`} className="p-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between hover:bg-slate-50">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {alertBadge(alert.severity)}
+                    <p className="font-medium text-slate-900">{alert.title}</p>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">{alert.description}</p>
+                </div>
+                {alert.leaseId ? (
+                  <Link href={`/leases/${alert.leaseId}`} className="text-sm font-medium text-brand-navy hover:underline">
+                    Open lease
+                  </Link>
+                ) : null}
+              </div>
+            ))
+          )}
+        </div>
+      </section>
 
       <form action={createLeaseAction} className="grid md:grid-cols-6 gap-3 rounded-2xl bg-white border shadow-sm p-5 mb-8">
         <select required name="tenantId" className="border rounded px-3 py-2 md:col-span-2">

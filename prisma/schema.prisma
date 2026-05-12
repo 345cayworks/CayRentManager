@@ -138,6 +138,13 @@ enum InvitationStatus {
   REVOKED
 }
 
+enum LeaseAlertSnapshotStatus {
+  ACTIVE
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
 model User {
   id             String    @id @default(cuid())
   netlifyUserId  String?   @unique
@@ -247,6 +254,7 @@ model LandlordProfile {
   documents           Document[]
   messages            Message[]
   auditLogs           AuditLog[]
+  leaseAlertSnapshots LeaseAlertSnapshot[]
 }
 
 model LandlordMembership {
@@ -465,6 +473,37 @@ model LeaseDocumentVersion {
 
   @@unique([leaseId, versionNumber])
   @@index([landlordId, uploadedAt])
+}
+
+model LeaseAlertSnapshot {
+  id          String                   @id @default(cuid())
+  landlordId  String
+  alertKey    String
+  type        String
+  severity    String
+  title       String
+  description String
+  leaseId     String?
+  tenantId    String?
+  propertyId  String?
+  unitId      String?
+  daysRemaining Int?
+  amount      Decimal?
+  status      LeaseAlertSnapshotStatus @default(ACTIVE)
+  firstSeenAt DateTime                 @default(now())
+  lastSeenAt  DateTime                 @default(now())
+  reviewedAt  DateTime?
+  resolvedAt  DateTime?
+  dismissedAt DateTime?
+  metadata    Json?
+
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+
+  @@unique([landlordId, alertKey])
+  @@index([landlordId, status])
+  @@index([landlordId, severity])
+  @@index([leaseId])
+  @@index([lastSeenAt])
 }
 
 model Invoice {

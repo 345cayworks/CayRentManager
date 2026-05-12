@@ -1,4 +1,3 @@
-import type { Handler } from '@netlify/functions';
 import { LeaseStatus, PaymentStatus } from '@prisma/client';
 import { prisma } from '../../src/lib/db/prisma';
 import { buildLeaseAlertFeed } from '../../src/lib/leases/lease-alerts';
@@ -16,7 +15,7 @@ function buildAlertKey(alert: {
   return [alert.type, alert.leaseId ?? 'none', alert.unitId ?? 'none', alert.propertyId ?? 'none'].join(':');
 }
 
-export const handler: Handler = async () => {
+export default async function leaseAlertScan() {
   try {
     const landlords = await prisma.landlordProfile.findMany({
       select: {
@@ -163,25 +162,35 @@ export const handler: Handler = async () => {
       }
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
+    return new Response(
+      JSON.stringify({
         success: true,
         landlordsProcessed: totalLandlords,
         activeAlerts: totalAlerts,
         resolvedAlerts: totalResolved,
         scannedAt: new Date().toISOString(),
       }),
-    };
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
   } catch (error) {
     console.error('lease-alert-scan failed', error);
 
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
+    return new Response(
+      JSON.stringify({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       }),
-    };
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    );
   }
-};
+}

@@ -43,6 +43,37 @@ enum LeaseStatus {
   TERMINATED
 }
 
+enum LeaseEventType {
+  EXPIRATION
+  RENEWAL_NOTICE
+  RENEWAL_DEADLINE
+  DEPOSIT_RETURN
+  INSPECTION
+  NOTICE_TO_VACATE
+  RENT_ESCALATION
+  DOCUMENT_EXPIRY
+  CUSTOM
+}
+
+enum LeaseRenewalStatus {
+  DRAFT
+  PROPOSED
+  ACCEPTED
+  DECLINED
+  COMPLETED
+  CANCELLED
+}
+
+enum LeaseNoticeType {
+  RENEWAL
+  NON_RENEWAL
+  NOTICE_TO_VACATE
+  RENT_INCREASE
+  INSPECTION
+  DEPOSIT_RETURN
+  CUSTOM
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -360,6 +391,80 @@ model Lease {
   invoices Invoice[]
   payments Payment[]
   documents Document[]
+  events LeaseEvent[]
+  renewals LeaseRenewal[]
+  notices LeaseNotice[]
+  documentVersions LeaseDocumentVersion[]
+}
+
+model LeaseEvent {
+  id          String         @id @default(cuid())
+  landlordId  String
+  leaseId     String
+  eventType   LeaseEventType
+  eventDate   DateTime
+  description String?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  lease Lease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@index([landlordId, eventDate])
+  @@index([leaseId, eventType])
+}
+
+model LeaseRenewal {
+  id                 String             @id @default(cuid())
+  landlordId         String
+  leaseId            String
+  renewalStartDate   DateTime
+  renewalEndDate     DateTime
+  proposedRentAmount Decimal?
+  status             LeaseRenewalStatus @default(DRAFT)
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  acceptedAt         DateTime?
+  completedAt        DateTime?
+
+  lease Lease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@index([landlordId, status])
+  @@index([leaseId, renewalStartDate])
+}
+
+model LeaseNotice {
+  id         String          @id @default(cuid())
+  landlordId String
+  leaseId    String
+  noticeType LeaseNoticeType
+  noticeDate DateTime
+  content    String
+  sentAt     DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  lease Lease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@index([landlordId, noticeDate])
+  @@index([leaseId, noticeType])
+}
+
+model LeaseDocumentVersion {
+  id            String   @id @default(cuid())
+  landlordId    String
+  leaseId        String
+  fileUrl        String
+  fileName       String?
+  documentType   String?
+  versionNumber  Int
+  uploadedAt     DateTime @default(now())
+
+  lease Lease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@unique([leaseId, versionNumber])
+  @@index([landlordId, uploadedAt])
 }
 
 model Invoice {

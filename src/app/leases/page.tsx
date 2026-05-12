@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { addDays, differenceInDays } from 'date-fns';
 import { LeaseStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
@@ -7,58 +8,267 @@ import { createLeaseAction, expireLeaseAction, terminateLeaseAction } from '@/se
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page() {
-  const { landlordId } = await getCurrentLandlordWorkspace();
-  const [tenants, units, leases] = await Promise.all([
-    prisma.tenant.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, orderBy: { fullName: 'asc' } }),
-    prisma.unit.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, include: { property: true }, orderBy: { unitName: 'asc' } }),
-    prisma.lease.findMany({ where: { landlordId }, include: { tenant: true, unit: true, property: true }, orderBy: { createdAt: 'desc' } }),
-  ]);
+function statCard(label: string, value: number | string) {
+  return (
+    <div className="rounded-2xl border bg-white p-5 shadow-sm">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function statusBadge(status: string) {
+  const styles: Record<string, string> = {
+    ACTIVE: 'bg-emerald-100 text-emerald-700',
+    EXPIRED: 'bg-red-100 text-red-700',
+    TERMINATED: 'bg-slate-200 text-slate-700',
+    DRAFT: 'bg-amber-100 text-amber-700',
+  };
 
   return (
-    <Shell title="Leases">
-      <form action={createLeaseAction} className="grid md:grid-cols-6 gap-3 rounded-xl bg-white border shadow-sm p-4 mb-4">
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${styles[status] ?? 'bg-slate-100 text-slate-700'}`}>
+      {status}
+    </span>
+  );
+}
+
+export default async function Page() {
+  const { landlordId } = await getCurrentLandlordWorkspace();
+
+  const now = new Date();
+  const next60Days = addDays(now, 60);
+
+  const [tenants, units, leases] = await Promise.all([
+    prisma.tenant.findMany({
+      where: { landlordId, status: RecordStatus.ACTIVE },
+      orderBy: { fullName: 'asc' },
+    }),
+    prisma.unit.findMany({
+      where: { landlordId, status: RecordStatus.ACTIVE },
+      include: {
+        property: true,
+        leases: {
+          where: {
+            status: LeaseStatus.ACTIVE,
+          },
+        },
+      },
+      orderBy: { unitName: 'asc' },
+    }),
+    prisma.lease.findMany({
+      where: { landlordId },
+      include: {
+        tenant: true,
+        unit: true,
+        property: true,
+        renewals: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { endDate: 'asc' },
+    }),
+  ]);
+
+  const activeLeases = leases.filter((lease) => lease.status === LeaseStatus.ACTIVE);
+  const expiringSoon = activeLeases.filter((lease) => lease.endDate <= next60Days);
+  const expiredLeases = leases.filter((lease) => lease.status === LeaseStatus.EXPIRED);
+  const vacantUnits = units.filter((unit) => unit.leases.length === 0);
+  const occupiedUnits = units.filter((unit) => unit.leases.length > 0);
+  const renewalPipeline = leases.filter((lease) => lease.renewals.length > 0);
+
+  return (
+    <Shell title="Lease Operations">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
+        <div>
+          <h2 className="text-3xl font-semibold">Lease Tracking & Alerts</h2>
+          <p className="text-slate-600 mt-1">
+            Monitor expirations, renewals, occupancy, and lease lifecycle activity.
+          </p>
+        </div>
+
+        <Link href="/app" className="rounded border px-4 py-2 text-sm font-medium hover:bg-slate-50">
+          Back to dashboard
+        </Link>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-5 mb-8">
+        {statCard('Active leases', activeLeases.length)}
+        {statCard('Expiring in 60 days', expiringSoon.length)}
+        {statCard('Renewal pipeline', renewalPipeline.length)}
+        {statCard('Occupied units', occupiedUnits.length)}
+        {statCard('Vacant units', vacantUnits.length)}
+      </div>
+
+      <form action={createLeaseAction} className="grid md:grid-cols-6 gap-3 rounded-2xl bg-white border shadow-sm p-5 mb-8">
         <select required name="tenantId" className="border rounded px-3 py-2 md:col-span-2">
           <option value="">Tenant</option>
-          {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.fullName}</option>)}
+          {tenants.map((tenant) => (
+            <option key={tenant.id} value={tenant.id}>
+              {tenant.fullName}
+            </option>
+          ))}
         </select>
+
         <select required name="unitId" className="border rounded px-3 py-2 md:col-span-2">
           <option value="">Unit</option>
-          {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.property.name} / {unit.unitName}</option>)}
+          {units.map((unit) => (
+            <option key={unit.id} value={unit.id}>
+              {unit.property.name} / {unit.unitName}
+            </option>
+          ))}
         </select>
+
         <input required name="startDate" type="date" className="border rounded px-3 py-2" />
         <input required name="endDate" type="date" className="border rounded px-3 py-2" />
         <input name="rentAmount" type="number" step="0.01" placeholder="Rent override" className="border rounded px-3 py-2" />
         <input name="depositAmount" type="number" step="0.01" placeholder="Deposit" className="border rounded px-3 py-2" />
-        <button className="rounded bg-brand-navy text-white px-4 py-2 md:col-span-4">Create lease</button>
+
+        <button className="rounded bg-brand-navy text-white px-4 py-2 md:col-span-4">
+          Create lease
+        </button>
       </form>
-      <div className="rounded-xl bg-white border shadow-sm divide-y">
-        {leases.length === 0 ? <p className="p-4 text-slate-600">No leases yet.</p> : null}
-        {leases.map((lease) => (
-          <div key={lease.id} className="p-4 flex justify-between gap-4">
-            <div>
-              <Link href={`/leases/${lease.id}`} className="font-medium text-brand-navy">
-                {lease.tenant.fullName} / {lease.property.name} / {lease.unit.unitName}
-              </Link>
-              <p className="text-sm text-slate-600">{lease.startDate.toLocaleDateString()} to {lease.endDate.toLocaleDateString()}</p>
-            </div>
-            <div className="text-right space-y-2">
-              <p className={lease.status === LeaseStatus.ACTIVE ? 'text-green-700' : 'text-slate-600'}>{lease.status}</p>
-              {lease.status === LeaseStatus.ACTIVE ? (
-                <div className="flex gap-2">
-                  <form action={terminateLeaseAction}>
-                    <input type="hidden" name="leaseId" value={lease.id} />
-                    <button className="text-sm rounded border px-3 py-1">Terminate</button>
-                  </form>
-                  <form action={expireLeaseAction}>
-                    <input type="hidden" name="leaseId" value={lease.id} />
-                    <button className="text-sm rounded border px-3 py-1">Expire</button>
-                  </form>
-                </div>
-              ) : null}
-            </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+          <div className="border-b px-6 py-4">
+            <h3 className="font-semibold text-lg">Upcoming Lease Expirations</h3>
+            <p className="text-sm text-slate-500 mt-1">
+              Leases requiring renewal attention or vacancy preparation.
+            </p>
           </div>
-        ))}
+
+          <div className="divide-y">
+            {expiringSoon.length === 0 ? (
+              <div className="p-8 text-center text-sm text-slate-500">
+                No leases expiring within the next 60 days.
+              </div>
+            ) : (
+              expiringSoon.map((lease) => {
+                const daysLeft = differenceInDays(lease.endDate, now);
+
+                return (
+                  <div key={lease.id} className="p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between hover:bg-slate-50">
+                    <div>
+                      <Link href={`/leases/${lease.id}`} className="font-medium text-brand-navy">
+                        {lease.tenant.fullName} / {lease.property.name} / {lease.unit.unitName}
+                      </Link>
+
+                      <p className="text-sm text-slate-600 mt-1">
+                        Ends {lease.endDate.toLocaleDateString()}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className={`font-medium ${daysLeft <= 14 ? 'text-red-600' : 'text-amber-600'}`}>
+                        {daysLeft} days left
+                      </span>
+
+                      {statusBadge(lease.status)}
+
+                      {lease.status === LeaseStatus.ACTIVE ? (
+                        <div className="flex gap-2">
+                          <form action={terminateLeaseAction}>
+                            <input type="hidden" name="leaseId" value={lease.id} />
+                            <button className="text-sm rounded border px-3 py-1">Terminate</button>
+                          </form>
+
+                          <form action={expireLeaseAction}>
+                            <input type="hidden" name="leaseId" value={lease.id} />
+                            <button className="text-sm rounded border px-3 py-1">Expire</button>
+                          </form>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        <div className="space-y-6">
+          <section className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h3 className="font-semibold text-lg">Renewal Activity</h3>
+
+            <div className="mt-4 space-y-3">
+              {renewalPipeline.length === 0 ? (
+                <p className="text-sm text-slate-500">No renewal activity yet.</p>
+              ) : (
+                renewalPipeline.slice(0, 6).map((lease) => {
+                  const renewal = lease.renewals[0];
+
+                  return (
+                    <div key={lease.id} className="rounded-xl border bg-slate-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-slate-900">{lease.tenant.fullName}</p>
+                          <p className="text-sm text-slate-500 mt-1">{lease.property.name}</p>
+                        </div>
+
+                        <span className="inline-flex rounded-full bg-cyan-100 px-3 py-1 text-xs font-medium text-cyan-700">
+                          {renewal.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h3 className="font-semibold text-lg">Vacancy Pipeline</h3>
+
+            <div className="mt-4 space-y-3">
+              {vacantUnits.length === 0 ? (
+                <p className="text-sm text-slate-500">No vacant units.</p>
+              ) : (
+                vacantUnits.map((unit) => (
+                  <div key={unit.id} className="rounded-xl border bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-slate-900">{unit.unitName}</p>
+                        <p className="text-sm text-slate-500 mt-1">
+                          {unit.property.name}
+                        </p>
+                      </div>
+
+                      <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                        Vacant
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h3 className="font-semibold text-lg">Expired / Terminated</h3>
+
+            <div className="mt-4 space-y-3">
+              {expiredLeases.length === 0 ? (
+                <p className="text-sm text-slate-500">No expired leases.</p>
+              ) : (
+                expiredLeases.slice(0, 5).map((lease) => (
+                  <div key={lease.id} className="rounded-xl border bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-slate-900">{lease.tenant.fullName}</p>
+                        <p className="text-sm text-slate-500 mt-1">
+                          {lease.property.name}
+                        </p>
+                      </div>
+
+                      {statusBadge(lease.status)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
       </div>
     </Shell>
   );

@@ -64,7 +64,7 @@ export async function createDocumentAction(formData: FormData) {
       documentType,
       fileName,
       fileUrl,
-      uploadedBy: user.id,
+      uploadedBy: user.userId,
     },
   });
 
@@ -92,7 +92,7 @@ export async function createUploadedDocumentPlaceholderAction(formData: FormData
       documentType,
       fileName: file.name,
       fileUrl: `pending-blob-upload://${landlordId}/${Date.now()}-${file.name}`,
-      uploadedBy: user.id,
+      uploadedBy: user.userId,
     },
   });
 
@@ -113,7 +113,7 @@ export async function archiveDocumentAction(formData: FormData) {
     data: {
       status: RecordStatus.ARCHIVED,
       archivedAt: new Date(),
-      archivedBy: user.id,
+      archivedBy: user.userId,
     },
   });
 

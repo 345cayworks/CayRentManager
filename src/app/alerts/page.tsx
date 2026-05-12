@@ -157,24 +157,24 @@ async function AlertsSection({
 }
 
 export default async function AlertsPage() {
-  const { landlord } = await getCurrentLandlordWorkspace();
+  const { landlordId } = await getCurrentLandlordWorkspace();
 
   const [activeCount, reviewedCount, resolvedCount] = await Promise.all([
     prisma.leaseAlertSnapshot.count({
       where: {
-        landlordId: landlord.id,
+        landlordId,
         status: 'ACTIVE',
       },
     }),
     prisma.leaseAlertSnapshot.count({
       where: {
-        landlordId: landlord.id,
+        landlordId,
         status: 'REVIEWED',
       },
     }),
     prisma.leaseAlertSnapshot.count({
       where: {
-        landlordId: landlord.id,
+        landlordId,
         status: 'RESOLVED',
       },
     }),

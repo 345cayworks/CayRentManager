@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { addDays, differenceInDays } from 'date-fns';
 import { LeaseStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
@@ -7,6 +6,17 @@ import { prisma } from '@/lib/db/prisma';
 import { createLeaseAction, expireLeaseAction, terminateLeaseAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
+
+function addDays(date: Date, days: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function differenceInDays(dateLeft: Date, dateRight: Date) {
+  const msPerDay = 1000 * 60 * 60 * 24;
+  return Math.ceil((dateLeft.getTime() - dateRight.getTime()) / msPerDay);
+}
 
 function statCard(label: string, value: number | string) {
   return (

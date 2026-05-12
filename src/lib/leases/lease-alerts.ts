@@ -72,6 +72,7 @@ export function getLeaseExpirationAlerts(leases: LeaseAlertLease[], from = new D
     if (lease.status !== 'ACTIVE') return [];
 
     const remaining = daysUntil(lease.endDate, from);
+
     if (remaining > 90) return [];
 
     if (remaining < 0) {
@@ -103,16 +104,19 @@ export function getLeaseExpirationAlerts(leases: LeaseAlertLease[], from = new D
 }
 
 export function getRenewalAlerts(leases: LeaseAlertLease[], from = new Date()): LeaseAlert[] {
-  return leases.flatMap((lease) => {
+  return leases.flatMap((lease): LeaseAlert[] => {
     if (lease.status !== 'ACTIVE') return [];
+
     const remaining = daysUntil(lease.endDate, from);
+
     if (remaining > 90) return [];
 
     const renewals = lease.renewals ?? [];
+
     if (renewals.length === 0) {
       return [{
-        type: 'RENEWAL_NOT_STARTED' as const,
-        severity: remaining <= 30 ? 'URGENT' as const : 'WARNING' as const,
+        type: 'RENEWAL_NOT_STARTED',
+        severity: remaining <= 30 ? 'URGENT' : 'WARNING',
         title: 'Renewal workflow not started',
         description: `${leaseLabel(lease)} is within the renewal window with no renewal record started.`,
         leaseId: lease.id,
@@ -124,10 +128,11 @@ export function getRenewalAlerts(leases: LeaseAlertLease[], from = new Date()): 
     }
 
     const latestRenewal = renewals[0];
+
     if (['DRAFT', 'PROPOSED'].includes(latestRenewal.status)) {
       return [{
-        type: 'RENEWAL_PENDING' as const,
-        severity: remaining <= 14 ? 'URGENT' as const : 'INFO' as const,
+        type: 'RENEWAL_PENDING',
+        severity: remaining <= 14 ? 'URGENT' : 'INFO',
         title: 'Renewal workflow pending',
         description: `${leaseLabel(lease)} has a renewal in ${latestRenewal.status.toLowerCase()} status.`,
         leaseId: lease.id,
@@ -143,16 +148,20 @@ export function getRenewalAlerts(leases: LeaseAlertLease[], from = new Date()): 
 }
 
 export function getComplianceAlerts(leases: LeaseAlertLease[], from = new Date()): LeaseAlert[] {
-  return leases.flatMap((lease) => {
+  return leases.flatMap((lease): LeaseAlert[] => {
     if (lease.status !== 'ACTIVE') return [];
+
     const remaining = daysUntil(lease.endDate, from);
+
     if (remaining > 60) return [];
+
     const notices = lease.notices ?? [];
+
     if (notices.length > 0) return [];
 
     return [{
-      type: 'NO_NOTICE_RECORDED' as const,
-      severity: remaining <= 30 ? 'WARNING' as const : 'INFO' as const,
+      type: 'NO_NOTICE_RECORDED',
+      severity: remaining <= 30 ? 'WARNING' : 'INFO',
       title: 'No lease notice recorded',
       description: `${leaseLabel(lease)} is approaching expiration with no renewal, non-renewal, or move-out notice recorded.`,
       leaseId: lease.id,
@@ -165,13 +174,14 @@ export function getComplianceAlerts(leases: LeaseAlertLease[], from = new Date()
 }
 
 export function getDelinquencyAlerts(leases: LeaseAlertLease[], highBalanceThreshold = 1000): LeaseAlert[] {
-  return leases.flatMap((lease) => {
+  return leases.flatMap((lease): LeaseAlert[] => {
     const totalBalance = (lease.payments ?? []).reduce((sum, payment) => sum + Number(payment.balance ?? 0), 0);
+
     if (totalBalance < highBalanceThreshold) return [];
 
     return [{
-      type: 'HIGH_BALANCE' as const,
-      severity: totalBalance >= highBalanceThreshold * 2 ? 'URGENT' as const : 'WARNING' as const,
+      type: 'HIGH_BALANCE',
+      severity: totalBalance >= highBalanceThreshold * 2 ? 'URGENT' : 'WARNING',
       title: 'High lease balance',
       description: `${leaseLabel(lease)} has an outstanding lease balance of $${totalBalance.toFixed(2)}.`,
       leaseId: lease.id,
@@ -184,13 +194,14 @@ export function getDelinquencyAlerts(leases: LeaseAlertLease[], highBalanceThres
 }
 
 export function getVacancyAlerts(units: LeaseAlertUnit[]): LeaseAlert[] {
-  return units.flatMap((unit) => {
+  return units.flatMap((unit): LeaseAlert[] => {
     const activeLeases = (unit.leases ?? []).filter((lease) => lease.status === 'ACTIVE');
+
     if (activeLeases.length > 0) return [];
 
     return [{
-      type: 'VACANT_UNIT' as const,
-      severity: 'INFO' as const,
+      type: 'VACANT_UNIT',
+      severity: 'INFO',
       title: 'Vacant unit',
       description: `${unit.property?.name ?? 'Property'} / ${unit.unitName ?? 'Unit'} has no active lease.`,
       propertyId: unit.propertyId ?? undefined,
@@ -209,7 +220,9 @@ const severityRank: Record<LeaseAlertSeverity, number> = {
 export function sortLeaseAlerts(alerts: LeaseAlert[]) {
   return [...alerts].sort((a, b) => {
     const severityDelta = severityRank[b.severity] - severityRank[a.severity];
+
     if (severityDelta !== 0) return severityDelta;
+
     return (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999);
   });
 }
@@ -221,6 +234,7 @@ export function buildLeaseAlertFeed(params: {
   highBalanceThreshold?: number;
 }) {
   const from = params.from ?? new Date();
+
   const alerts = [
     ...getLeaseExpirationAlerts(params.leases, from),
     ...getRenewalAlerts(params.leases, from),

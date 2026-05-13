@@ -1,58 +1,56 @@
-# CayRentManager Development Plan
+# CayRentManager Roadmap & Current Status
 
-## 1. Project Vision
+_Last updated: May 2026_
 
-CayRentManager is a multi-landlord property and rent management platform designed to help landlords manage rental inventory, tenants, leases, payments, expenses, maintenance, documents, and portfolio performance from one dashboard.
+## 1. Product Vision
 
-The platform should support:
+CayRentManager is evolving from a landlord record-management app into a Cayman-focused property operations platform.
 
-- Multiple landlords on one system
-- Strict data isolation between landlords
-- Tenant onboarding through invitations
-- Lease and rental contract management
-- Payment tracking and tenant balances
-- Expense tracking by property/unit
-- Cashflow reporting by unit, property, and portfolio
-- Basic accounting views
-- Maintenance tracking
-- Document storage and lease records
-- Superadmin platform management
+The platform is designed to help landlords, property managers, accountants, tenants, vendors, concierge agents, and platform administrators manage rental operations from one secure system.
 
-The goal is to move from a rescued MVP foundation to a production-ready SaaS platform.
+Strategic direction:
+
+```text
+Property management + operational intelligence + vendor network + compliance/document workflows
+```
+
+The long-term goal is not only to help landlords track properties, leases, rent, documents, and maintenance, but to become a monetizable property operations network for the Cayman Islands and eventually other Caribbean markets.
 
 ---
 
 ## 2. Current Architecture
 
-### Stack
+### Core Stack
 
 - Next.js App Router
 - TypeScript
 - Prisma ORM
-- Netlify Database / PostgreSQL
+- PostgreSQL / Netlify Database
 - Netlify Identity
 - Custom app session bridge
 - Tailwind CSS
 - Netlify deployment
+- Netlify scheduled/serverless functions
+- Netlify database migrations
 
 ### Authentication Model
 
-Netlify Identity handles authentication:
+Netlify Identity handles:
 
-- Login
-- Signup
-- Logout
-- Password recovery
-- Email confirmation/invites
+- signup
+- login
+- logout
+- password recovery
+- identity session
 
-Prisma controls app access:
+Prisma controls application access:
 
-- User role
-- User status
-- Landlord memberships
-- Tenant linkage
-- Disabled access
-- Audit history
+- user role
+- user status
+- landlord memberships
+- tenant linkage
+- disabled/suspended access
+- audit history
 
 ### App Session Model
 
@@ -67,9 +65,9 @@ crm_app_session
 The cookie is:
 
 - HttpOnly
-- Signed
-- Stored as a hash in the database
-- Expiring after 14 days
+- signed
+- stored as a hash in the database
+- expiring after 14 days
 
 Required environment variable:
 
@@ -79,179 +77,288 @@ APP_SESSION_SECRET
 
 ---
 
-## 3. Environment Variables
+## 3. Current Production Status
 
-Required:
-
-```text
-DATABASE_URL
-APP_SESSION_SECRET
-NEXT_PUBLIC_APP_URL
-SUPER_ADMIN_EMAIL
-SUPERADMIN_MASTER_KEY
-```
-
-Only this should be public:
+Current classification:
 
 ```text
-NEXT_PUBLIC_APP_URL
+B+ / Early Beta Foundation
 ```
 
-Never expose these with `NEXT_PUBLIC_`:
+The platform now has meaningful operational depth, but final production confidence still depends on clean Netlify deploys, manual QA, and continued hardening of onboarding, permissions, and edge cases.
 
-```text
-DATABASE_URL
-APP_SESSION_SECRET
-SUPERADMIN_MASTER_KEY
-```
+### Latest Confirmed Main Status
 
-### Superadmin Bootstrap
+Latest confirmed merged work includes:
 
-The app supports an emergency owner bootstrap process using:
+- Phase 4 alert center and alert automation foundation
+- document vault foundation
+- registration workflow tightening
+- professional onboarding page
+- auth input readability fix
+- password visibility toggles
 
-```text
-SUPER_ADMIN_EMAIL
-SUPERADMIN_MASTER_KEY
-```
-
-This is for emergency repair only. It should not be used as the normal login system.
-
-Normal login remains through Netlify Identity.
-
-Emergency repair endpoint:
-
-```text
-POST /api/admin/bootstrap-owner
-```
-
-Request body:
-
-```json
-{
-  "masterKey": "..."
-}
-```
-
-Rules:
-
-- `SUPER_ADMIN_EMAIL` is the only email that can be promoted.
-- `SUPERADMIN_MASTER_KEY` must match the submitted `masterKey`.
-- The endpoint must not support `GET`.
-- The client must not choose the email or role.
-- The master key must never be committed, logged, printed, stored in the database, returned in JSON, or exposed with `NEXT_PUBLIC_`.
-- The response must only include safe fields such as `ok`, `email`, `role`, and `status`.
-- Owner may disable or remove this endpoint after confirming Superadmin access.
+Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
 ---
 
-## 4. Primary Roles
+## 4. Completed / Implemented Areas
 
-### SUPERADMIN
+## Phase 1 — Core Platform Stabilization
 
-Platform owner/admin.
+Status:
 
-Can:
+```text
+Mostly complete
+```
 
-- View all platform users
-- View all landlord workspaces
-- Disable/reactivate users
-- Assign roles
-- Archive/reactivate landlord workspaces
-- View audit logs
-- Manage platform-level settings
+Implemented or substantially improved:
 
-### LANDLORD
+- role model
+- user status model
+- landlord workspace model
+- app session bridge
+- scoped landlord access helpers
+- superadmin access model
+- no-hard-delete direction for operational records
+- Netlify database migration discipline
+- route and navigation stabilization work
 
-Owns and manages one or more landlord workspaces.
+Remaining:
 
-Can:
-
-- Create properties
-- Create units
-- Invite tenants
-- Create leases
-- Record payments
-- Record expenses
-- View dashboard metrics
-- Track portfolio performance
-
-### PROPERTY_MANAGER
-
-Can manage assigned landlord workspaces.
-
-Can eventually:
-
-- Manage properties
-- Manage units
-- Manage tenants
-- Manage maintenance
-- View operational dashboards
-
-### ACCOUNTANT
-
-Can view and manage financial records for assigned landlord workspaces.
-
-Can eventually:
-
-- View payments
-- View expenses
-- Export reports
-- Review cashflow
-- Produce owner statements
-
-### TENANT
-
-Can only access their own tenant portal.
-
-Can:
-
-- View lease
-- View payment history
-- View balance
-- Submit maintenance requests
-- View tenant documents
+- final automated tests for access control
+- full QA pass for all role redirects
+- stronger tenant invite edge-case tests
+- final bootstrap endpoint policy decision
 
 ---
 
-## 5. Access Control Rules
+## Phase 2 — Superadmin Platform Management
 
-### Core Rules
-
-- Landlord A must never see Landlord B data.
-- Tenant A must never see Tenant B data.
-- Tenant cannot choose landlord.
-- Public users cannot self-register as Superadmin.
-- Public users cannot self-register as Tenant.
-- Public landlord registration creates Landlord only.
-- Tenant onboarding requires invite token.
-- Disabled users cannot access dashboards.
-- Superadmin must not be disabled if they are the only active Superadmin.
-
-### Server-Side Helpers
-
-The app should continue to use helpers like:
+Status:
 
 ```text
-requireAuth()
-requireRole()
-requireSuperadmin()
-requireLandlordAccess()
-requireTenantAccess()
-getCurrentLandlordWorkspace()
+Partially complete / usable foundation
 ```
 
-Server actions must never trust:
+Implemented or started:
+
+- superadmin role
+- admin dashboard area
+- user management foundation
+- landlord management foundation
+- audit log structure
+- reset/temporary-password work from previous sprint
+- user account status controls
+
+Remaining high-value work:
+
+- global vendor management
+- admin analytics
+- user impersonation is not recommended yet
+- richer audit views
+- admin safety constraints review
+- billing/plan management later
+
+---
+
+## Phase 3 — Maintenance Foundation
+
+Status:
 
 ```text
-client-submitted userId
-client-submitted landlordId
-client-submitted tenantId
-client-submitted role
+Implemented foundation
+```
+
+Implemented:
+
+- maintenance request model
+- maintenance categories
+- maintenance priority
+- maintenance status
+- attachments/comments/work-order structure
+- landlord maintenance vendor model
+- maintenance vendor assignment concept
+- vendor/work-order relations
+
+Current vendor model:
+
+```text
+MaintenanceVendor is landlord-scoped through landlordId
+```
+
+This means each landlord can maintain their own private vendor list.
+
+Remaining:
+
+- richer vendor UI
+- vendor portal login
+- work-order dispatch workflow
+- maintenance SLA tracking
+- before/after photo uploads
+- vendor marketplace/global vendor layer
+
+---
+
+## Phase 4 — Lease Tracking & Alerts
+
+Status:
+
+```text
+Strong foundation complete
+```
+
+Implemented:
+
+- lease model and lease status
+- lease events
+- lease renewals
+- lease notices
+- lease document versions
+- lease operations dashboard
+- lease expiration alert engine
+- alert severity logic
+- persistent alert snapshots
+- scheduled alert scanner
+- alert lifecycle states
+- alert center UI
+- review/dismiss workflow
+- alert dashboard integration
+
+Alert lifecycle:
+
+```text
+ACTIVE → REVIEWED → RESOLVED / DISMISSED
+```
+
+Current strategic value:
+
+```text
+CayRentManager now has operational intelligence, not just record tracking.
+```
+
+Remaining:
+
+- email/SMS notification layer
+- alert badges in navigation
+- daily digest
+- escalation routing
+- concierge assignment
+- alert preferences
+
+---
+
+## Phase 4.4 — Document Infrastructure
+
+Status:
+
+```text
+Foundation complete / upload-ready
+```
+
+Implemented:
+
+- document vault page
+- document metadata workflow
+- document archive workflow
+- document association to property/unit/tenant/lease
+- upload-ready validation layer
+- supported file types
+- pending-upload state
+- external document URL support
+
+Supported upload types in validation layer:
+
+```text
+PDF, JPG, PNG, WEBP, DOC, DOCX
+```
+
+Current storage state:
+
+```text
+External URLs + upload-ready placeholders
+```
+
+Remaining:
+
+- install and commit `@netlify/blobs`
+- real binary upload to Netlify Blobs or Cloudinary/S3/R2
+- secure download endpoint
+- image/PDF preview
+- document visibility rules
+- tenant-visible documents
+- compliance expiry alerts
+
+---
+
+## Registration Phase 1 — Workflow Tightening
+
+Status:
+
+```text
+Completed
+```
+
+Implemented:
+
+- confirm password field
+- password strength validation
+- password requirements helper text
+- default auth redirect aligned to dashboard
+- auth input text readability fix
+- password show/hide toggle
+- black/dark input text on white background
+- safer registration UX
+
+Password rules:
+
+```text
+Minimum 8 characters
+At least one uppercase letter
+At least one number
 ```
 
 ---
 
-## 6. Current MVP Routes
+## Registration Phase 2 — Professional Onboarding
+
+Status:
+
+```text
+Foundation implemented
+```
+
+Implemented:
+
+- new landlord onboarding route
+- first-login onboarding redirect when a workspace is created
+- onboarding progress cards
+- setup milestones
+- property/unit/tenant/maintenance starter flow
+- setup progress count
+
+Current onboarding milestones:
+
+```text
+Add first property
+Create units
+Invite tenants
+Activate maintenance tracking
+```
+
+Remaining:
+
+- company profile setup wizard
+- `/properties/new` dedicated first-property wizard
+- `/units/new` dedicated guided unit flow
+- `/tenants/new` invite-first-tenant flow
+- onboarding completion persistence
+- skip/dismiss onboarding preference
+- onboarding checklist badges in dashboard
+
+---
+
+## 5. Current Route Map
 
 ### Public Routes
 
@@ -261,6 +368,19 @@ client-submitted role
 /register
 /invite/[token]
 /unauthorized
+```
+
+### Registration / Onboarding
+
+```text
+/onboarding
+/dashboard
+```
+
+Note:
+
+```text
+/dashboard is provided by the landlord route group and must not be duplicated by src/app/dashboard/page.tsx.
 ```
 
 ### Superadmin Routes
@@ -276,25 +396,32 @@ client-submitted role
 
 ```text
 /dashboard
+/alerts
 /properties
 /units
 /tenants
 /leases
 /payments
+/payments/settings
+/maintenance
+/maintenance/vendors
 /expenses
+/documents
+/reports
 ```
 
 ### Tenant Routes
 
 ```text
 /tenant/dashboard
+/tenant/maintenance
 ```
 
 ---
 
-## 7. Data Model Overview
+## 6. Current Core Data Models
 
-The core Prisma models include:
+Current major models include:
 
 ```text
 User
@@ -306,504 +433,423 @@ Unit
 Tenant
 TenantInvitation
 Lease
+LeaseEvent
+LeaseRenewal
+LeaseNotice
+LeaseDocumentVersion
+LeaseAlertSnapshot
+Invoice
 Payment
+Receipt
+PaymentProof
+PaymentMethod
+BankAccount
 Expense
 MaintenanceRequest
+MaintenanceAttachment
+MaintenanceComment
+MaintenanceVendor
+MaintenanceWorkOrder
 Document
 Message
 AuditLog
 ```
 
-### Legacy Models
-
-The following models may remain from earlier Auth.js work:
+Current role enum includes:
 
 ```text
-Account
-Session
-VerificationToken
+SUPERADMIN
+LANDLORD
+PROPERTY_MANAGER
+ACCOUNTANT
+TENANT
+VENDOR
+MAINTENANCE_PROVIDER
+CONCIERGE_AGENT
+GUEST
 ```
-
-Do not remove them without a controlled migration.
 
 ---
 
-## 8. Production Readiness Status
+## 7. New Strategic Opportunity — Global Vendor Marketplace
 
-Current classification:
+Status:
 
 ```text
-B+ MVP foundation
+Recommended next monetization phase
 ```
 
-The foundation is real and usable, but production hardening is required before onboarding real landlords or tenants.
+Current vendor state:
 
-### Strong Areas
+```text
+Landlords can have their own private MaintenanceVendor records.
+```
 
-- Real database schema exists.
-- Netlify Identity is integrated.
-- Prisma role model exists.
-- App session bridge exists.
-- Landlord workspace model exists.
-- Core landlord workflow pages exist.
-- Dashboard metrics exist.
-- Lifecycle actions exist.
-- No-hard-delete policy exists.
+Proposed expansion:
 
-### Weak Areas
+```text
+Superadmins can onboard global vendors that all landlords can access.
+```
 
-- Temporary bootstrap endpoint must be protected or removed.
-- Some scoped Prisma updates need hardening.
-- Tenant invite acceptance needs transaction handling.
-- Public landlord registration needs duplicate prevention.
-- Navigation needs role awareness.
-- Admin role changes need stronger safety rules.
-- Forms need validation.
-- Tenant dashboard needs stronger tenant-only access.
-- Reports/accounting need deeper buildout.
+Strategic value:
+
+- new revenue stream
+- stronger marketplace defensibility
+- vendor sponsorship opportunities
+- concierge/service dispatch opportunities
+- Cayman-specific property operations network
+
+### Recommended Architecture
+
+Do not make `MaintenanceVendor.landlordId` optional.
+
+Instead, add a separate platform-level model:
+
+```prisma
+model GlobalVendor {
+  id              String       @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  website         String?
+  specialty       String?
+  serviceAreas    String?
+  description     String?
+  logoUrl         String?
+  approvedStatus  Boolean      @default(false)
+  featured        Boolean      @default(false)
+  sponsored       Boolean      @default(false)
+  monthlyFee      Decimal?
+  status          RecordStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+```
+
+Optional bookmark/copy model:
+
+```prisma
+model LandlordVendorBookmark {
+  id             String   @id @default(cuid())
+  landlordId     String
+  globalVendorId String
+  createdAt      DateTime @default(now())
+
+  @@unique([landlordId, globalVendorId])
+}
+```
+
+### Recommended MVP Approach
+
+Use a copy-to-local approach:
+
+```text
+Global Vendor → Add to My Vendors → creates landlord-scoped MaintenanceVendor copy
+```
+
+Why:
+
+- least risky
+- current maintenance assignment workflow keeps working
+- landlord can add private notes
+- avoids changing work-order relations immediately
+
+### Monetization Options
+
+Potential streams:
+
+- paid vendor listings
+- featured placement
+- sponsored categories
+- verified vendor badge
+- lead generation fee
+- concierge dispatch fee
+- category exclusivity
+
+Possible Cayman price bands:
+
+```text
+Verified listing: CI$49–CI$149/month
+Featured listing: CI$99–CI$299/month
+Category exclusivity: CI$500–CI$1,500/month
+Lead fee: CI$10–CI$25 per qualified inquiry
+Concierge dispatch: 5%–15% of work order value
+```
 
 ---
 
-# 9. Development Phases
+## 8. Recommended Next Development Phases
 
-## Phase 1 — Production Hardening
+## Phase 5.1 — Global Vendor Foundation
+
+Priority:
+
+```text
+High
+```
 
 Goal:
 
-Make the current MVP safer and more reliable before expanding features.
+Allow superadmins to create and manage platform-level vendor listings.
 
-### Phase 1 Tasks
+Build:
 
-1. Protect or remove temporary bootstrap route.
-2. Add `/api/health`.
-3. Add `/api/identity/me`.
-4. Fix scoped Prisma lifecycle updates.
-5. Harden tenant invite acceptance.
-6. Harden public landlord registration.
-7. Make navigation role-aware.
-8. Tighten admin role assignment.
-9. Add tests for critical access flows.
-10. Confirm Superadmin access works.
+- `GlobalVendor` Prisma model
+- Netlify database migration
+- `/admin/vendors`
+- create/edit/archive global vendor
+- approve/unapprove vendor
+- featured/sponsored flags
+- specialty and service-area fields
+- notes/description
 
-### Acceptance Criteria
+Acceptance criteria:
 
+- Superadmin can create a global vendor.
+- Superadmin can activate/archive a global vendor.
+- Global vendors are not landlord-owned.
+- Landlords cannot create or edit global vendors.
 - Build passes.
-- Tests pass.
-- Superadmin can access `/admin`.
-- Temporary bootstrap route is not publicly usable.
-- Health endpoint works.
-- Identity status endpoint works.
-- Landlord isolation remains enforced.
-- Tenant invite flow cannot create duplicate tenants.
-- Public registration cannot duplicate landlord workspaces.
-- No `/dashboard?error=forbidden` redirect loop exists.
 
 ---
 
-## Phase 2 — Admin Management
+## Phase 5.2 — Landlord Vendor Marketplace
 
-Goal:
-
-Make the Superadmin dashboard useful for platform operations.
-
-### Features
-
-- User search
-- User filters by role/status
-- User detail page
-- Role assignment with safety rules
-- Disable/reactivate users
-- Landlord workspace list
-- Landlord detail page
-- Archive/reactivate landlord workspaces
-- Audit log viewer
-- Platform settings page
-
-### Admin Safety Rules
-
-- Cannot disable the only active Superadmin.
-- Cannot remove Superadmin role from the only active Superadmin.
-- Cannot assign Tenant role without tenant record.
-- Cannot assign Property Manager or Accountant without workspace assignment.
-- All actions must write audit logs.
-
----
-
-## Phase 3 — Landlord Workflow Completion
-
-Goal:
-
-Make the core landlord workflow usable by real beta testers.
-
-### Features
-
-- Property detail page
-- Edit property
-- Archive/reactivate property
-- Unit detail page
-- Edit unit
-- Archive/reactivate unit
-- Tenant detail page
-- Invite tenant
-- Resend tenant invite
-- Revoke tenant invite
-- Lease creation
-- Lease detail page
-- Lease termination
-- Payment recording
-- Payment history
-- Expense recording
-- Expense history
-
-### Workflow
+Priority:
 
 ```text
-Landlord registers
-→ creates property
-→ creates unit
-→ invites tenant
-→ tenant accepts invite
-→ landlord creates lease
-→ landlord records rent payment
-→ landlord records expense
-→ dashboard updates
+High
 ```
 
----
-
-## Phase 4 — Tenant Portal
-
 Goal:
 
-Give tenants a simple, secure portal.
+Allow landlords to browse global vendors and add them to their local vendor list.
 
-### Features
+Build:
 
-- Tenant dashboard
-- Lease summary
-- Payment history
-- Outstanding balance
-- Maintenance request submission
-- Document list
-- Message landlord/property manager
+- marketplace section in `/maintenance/vendors`
+- search/filter by specialty
+- visible featured vendors
+- `Add to My Vendors` action
+- duplicate protection
+- global vendor badge
+- local copy creation into `MaintenanceVendor`
 
-### Security Rules
+Acceptance criteria:
 
-- Tenant can only see their own data.
-- Tenant cannot access landlord dashboard.
-- Tenant cannot view other tenants.
-- Tenant cannot change lease/payment records.
+- Landlord can browse active global vendors.
+- Landlord can add a global vendor to their vendor list.
+- Duplicate copies are prevented.
+- Existing maintenance request assignment still uses `MaintenanceVendor`.
 
 ---
 
-## Phase 5 — Maintenance Management
+## Phase 5.3 — Vendor Monetization Layer
 
-Goal:
-
-Allow landlords and tenants to manage repair requests.
-
-### Features
-
-- Create maintenance request
-- Upload photo
-- Assign priority
-- Change status
-- Track estimated cost
-- Track final cost
-- Close request
-- Archive request
-
-### Statuses
+Priority:
 
 ```text
-OPEN
-IN_PROGRESS
-RESOLVED
-CLOSED
-ARCHIVED
+Medium-high
 ```
-
----
-
-## Phase 6 — Document Management
 
 Goal:
 
-Store and organize lease/property/tenant documents.
+Turn global vendors into a revenue stream.
 
-### Features
+Build:
 
-- Upload document
-- Attach to property
-- Attach to unit
-- Attach to tenant
-- Attach to lease
-- Archive document
-- Tenant-visible documents
-- Landlord-only documents
+- monthly fee field
+- sponsored/featured reporting
+- vendor listing status
+- inquiry tracking
+- lead count tracking
+- manual billing notes
+- later: Stripe/payment integration
 
-### Document Types
+---
+
+## Phase 6 — Notification Infrastructure
+
+Priority:
 
 ```text
-Lease
-Signed Lease
-ID
-Inspection
-Receipt
-Insurance
-Property Document
-Other
+High
 ```
+
+Build:
+
+- alert badges in navigation
+- unread alert counts
+- notification preferences
+- daily digest framework
+- email abstraction
+- SMS/WhatsApp-ready abstraction
+- escalation rules
 
 ---
 
-## Phase 7 — Reports and Basic Accounting
+## Phase 7 — Real Upload Infrastructure
 
-Goal:
-
-Move from simple tracking to useful financial reporting.
-
-### MVP Reports
-
-- Rent Roll
-- Tenant Balance Report
-- Payment History
-- Expense Report
-- Property P&L
-- Unit Cashflow
-- Portfolio Cashflow
-- Lease Expiry Report
-- Maintenance Cost Report
-- Tax Summary
-
-### Future Accounting Model
-
-The current payment model is enough for MVP. Later, add a real rent ledger:
+Priority:
 
 ```text
-Recurring charges
-Payment allocations
-Late fees
-Credits
-Refunds
-Adjustments
-Receipts
-Balance forward
+High
 ```
 
----
+Build:
 
-## Phase 8 — Production Polish
-
-Goal:
-
-Prepare for public beta or paid pilot users.
-
-### Tasks
-
-- Better landing page
-- Mobile-responsive polish
-- Empty states
-- Loading states
-- Error boundaries
-- Toast messages
-- Form validation
-- Confirmation modals
-- Help text
-- Onboarding checklist
-- Privacy policy
-- Terms of service
-- Data deletion/retention policy
-- Backup/recovery process
+- install and commit `@netlify/blobs`
+- server-side upload helper
+- secure blob keys
+- document download endpoint
+- preview support
+- maintenance photo uploads
+- tenant document uploads
 
 ---
 
-# 10. Immediate Backlog
+## Phase 8 — Reporting & Accounting Expansion
+
+Priority:
+
+```text
+Medium-high
+```
+
+Build:
+
+- rent roll
+- tenant balance report
+- payment history
+- expense report
+- property P&L
+- unit cashflow
+- portfolio cashflow
+- maintenance cost report
+- lease expiry report
+- owner statements later
+
+---
+
+## Phase 9 — Tenant Portal Expansion
+
+Priority:
+
+```text
+Medium
+```
+
+Build:
+
+- tenant lease view
+- tenant payment history
+- tenant balance
+- tenant maintenance requests
+- tenant document vault
+- landlord messages
+
+---
+
+## Phase 10 — Production Polish & Public Beta
+
+Priority:
+
+```text
+Ongoing
+```
+
+Build:
+
+- mobile polish
+- empty states
+- loading states
+- toasts
+- confirmation modals
+- error boundaries
+- privacy policy
+- terms of service
+- backup/recovery process
+- public beta onboarding checklist
+
+---
+
+## 9. Immediate Backlog
 
 ## Critical
 
-- Confirm `/admin` works for Superadmin.
-- Protect or remove bootstrap route.
-- Fix scoped update mutations.
-- Add health/status endpoints.
-- Harden tenant invite acceptance.
-- Harden public registration.
-- Make navigation role-aware.
+- Confirm Netlify build passes after the latest fixes.
+- Confirm `/login` input text is visible.
+- Confirm password show/hide works.
+- Confirm `/dashboard` has only one route source.
+- Confirm `/onboarding` does not import missing dependencies.
+- Confirm `/alerts` renders inside the sidebar shell.
 
 ## High Priority
 
-- Improve `/admin/users`.
-- Add `/admin/audit`.
-- Add landlord detail page.
-- Add tenant detail page.
-- Add lease detail page.
-- Add payment detail/history.
-- Add expense categories.
+- Implement Phase 5.1 global vendor foundation.
+- Add `/admin/vendors`.
+- Add marketplace section to `/maintenance/vendors`.
+- Add real upload infrastructure.
+- Add alert badges and notification counts.
 
 ## Medium Priority
 
-- Add maintenance workflow.
-- Add document workflow.
-- Add reporting pages.
-- Add CSV exports.
-- Improve dashboard charts.
-
-## Later
-
-- Online rent payments.
-- Digital signatures.
-- Owner statements.
-- Multi-currency.
-- QuickBooks export.
-- Stripe integration.
-- Email notifications.
-- SMS/WhatsApp reminders.
+- Add guided `/properties/new` and `/units/new` routes.
+- Add onboarding completion persistence.
+- Add document visibility rules.
+- Add reporting expansion.
 
 ---
 
-# 11. Development Workflow
+## 10. Manual QA Checklist
 
-## Branching
-
-Use feature branches:
-
-```bash
-git checkout -b production-hardening-phase-1
-```
-
-Do not commit directly to main unless emergency rescue is required.
-
-## Standard Commands
-
-```bash
-npm install
-npx prisma generate
-npm run build
-npm test
-```
-
-## Deployment Control
-
-Codex and agents should not deploy to Netlify automatically.
-
-Process:
-
-```text
-1. Create branch
-2. Commit changes
-3. Open PR
-4. Human reviews PR
-5. Human merges
-6. Human triggers Netlify deploy manually
-```
-
-## PR Requirements
-
-Each PR should include:
-
-- Summary of changes
-- Files changed
-- Tests run
-- Risks
-- Manual QA steps
-- Rollback notes
-
----
-
-# 12. Manual QA Checklist
-
-Before every production deploy:
+Before production deploy:
 
 ```text
 npm install passes
 npx prisma generate passes
 npm run build passes
-npm test passes
 /login loads
-info@cayworks.com can log in
-/admin loads for Superadmin
-/dashboard loads for Landlord
-/tenant/dashboard loads for Tenant
-Unauthorized users go to /unauthorized
+/register loads
+Typed login text is visible
+Password show/hide works
+New landlord registration works
+New landlord lands on onboarding
+Existing landlord lands on dashboard
+/dashboard loads without route collision
+/onboarding loads without missing packages
+/alerts loads with sidebar
+/documents loads with sidebar
+/leases loads
+/maintenance/vendors loads
+Superadmin can access /admin
+Landlord cannot access /admin
+Tenant cannot access landlord dashboard
 Disabled users are blocked
-Property creation works
-Unit creation works
-Tenant invite works
-Lease creation works
-Payment recording works
-Expense recording works
-Dashboard updates
 No cross-landlord data leakage
-No tenant data leakage
-No hard deletes
+No hard deletes for operational records
 ```
 
 ---
 
-# 13. Security Checklist
+## 11. Current Strategic Position
 
-- Secrets are never committed.
-- Only `NEXT_PUBLIC_APP_URL` is public.
-- `APP_SESSION_SECRET` is set.
-- `SUPERADMIN_MASTER_KEY` is set only server-side.
-- Bootstrap endpoint is protected or removed.
-- No role is accepted from client input.
-- No landlordId is trusted from client input.
-- No tenantId is trusted without server-side ownership check.
-- Disabled users are blocked.
-- Audit logs are written for sensitive actions.
-- Superadmin lockout protection exists.
-- No hard-delete for core production records.
+CayRentManager now has the building blocks of a serious property operations platform:
 
----
+- landlord workspace management
+- property/unit/tenant/lease foundations
+- payments and accounting foundation
+- maintenance foundation
+- document vault foundation
+- operational alert engine
+- scheduled alert automation
+- professional onboarding
+- superadmin foundation
 
-# 14. Next Recommended Codex Prompt
-
-Use this for the next agent pass:
+The highest-value next product move is:
 
 ```text
-Start production-hardening-phase-1 for CayRentManager.
-
-Do not deploy to Netlify.
-Do not merge to main.
-Create a branch, commit changes, open a PR, and stop.
-
-Focus only on:
-1. Protect/remove bootstrap route.
-2. Add /api/health.
-3. Add /api/identity/me.
-4. Fix scoped Prisma lifecycle updates.
-5. Harden tenant invite acceptance.
-6. Harden public landlord registration.
-7. Make navigation role-aware.
-8. Tighten admin role assignment.
-9. Add tests.
-10. Update README/development docs.
-
-Run:
-npm install
-npx prisma generate
-npm run build
-npm test
-
-Report files changed, tests run, and remaining risks.
+Global Vendor Marketplace + Maintenance Vendor Monetization
 ```
 
----
-
-# 15. Definition of Production Ready
-
-CayRentManager is production ready when:
-
-- Superadmin can manage platform safely.
-- Landlords can complete core workflow without support.
-- Tenants can accept invites and access only their portal.
-- Payments and expenses are tracked reliably.
-- Dashboard metrics are accurate enough for operational use.
-- Data isolation has been tested.
-- Critical actions are audited.
-- No temporary debug routes remain exposed.
-- No hard-delete paths exist for financial/history records.
-- Build and tests pass consistently.
-- Netlify deploys cleanly.
-- Manual QA checklist passes.
+This turns the platform from a landlord software tool into a Cayman property operations network.

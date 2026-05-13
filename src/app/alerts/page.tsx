@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Shell } from '@/components/shell';
 import { prisma } from '@/lib/db/prisma';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import {
@@ -181,54 +182,56 @@ export default async function AlertsPage() {
   ]);
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 text-white shadow-xl">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
-              Operations Center
-            </p>
+    <Shell title="Alert Center">
+      <div className="space-y-8">
+        <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 text-white shadow-xl">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
+                Operations Center
+              </p>
 
-            <h1 className="mt-3 text-4xl font-black tracking-tight">
-              Alert Center
-            </h1>
+              <h1 className="mt-3 text-4xl font-black tracking-tight">
+                Alert Center
+              </h1>
 
-            <p className="mt-4 max-w-2xl text-sm text-slate-300">
-              Monitor lease expirations, renewal gaps, vacancies, compliance risks,
-              and operational issues across your portfolio.
-            </p>
+              <p className="mt-4 max-w-2xl text-sm text-slate-300">
+                Monitor lease expirations, renewal gaps, vacancies, compliance risks,
+                and operational issues across your portfolio.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                <p className="text-xs uppercase tracking-wide text-slate-300">
+                  Active
+                </p>
+                <p className="mt-2 text-3xl font-black">{activeCount}</p>
+              </div>
+
+              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                <p className="text-xs uppercase tracking-wide text-slate-300">
+                  Reviewed
+                </p>
+                <p className="mt-2 text-3xl font-black">{reviewedCount}</p>
+              </div>
+
+              <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+                <p className="text-xs uppercase tracking-wide text-slate-300">
+                  Resolved
+                </p>
+                <p className="mt-2 text-3xl font-black">{resolvedCount}</p>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
-              <p className="text-xs uppercase tracking-wide text-slate-300">
-                Active
-              </p>
-              <p className="mt-2 text-3xl font-black">{activeCount}</p>
-            </div>
+        <AlertsSection title="Active Alerts" status="ACTIVE" />
 
-            <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
-              <p className="text-xs uppercase tracking-wide text-slate-300">
-                Reviewed
-              </p>
-              <p className="mt-2 text-3xl font-black">{reviewedCount}</p>
-            </div>
+        <AlertsSection title="Reviewed Alerts" status="REVIEWED" />
 
-            <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
-              <p className="text-xs uppercase tracking-wide text-slate-300">
-                Resolved
-              </p>
-              <p className="mt-2 text-3xl font-black">{resolvedCount}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <AlertsSection title="Active Alerts" status="ACTIVE" />
-
-      <AlertsSection title="Reviewed Alerts" status="REVIEWED" />
-
-      <AlertsSection title="Resolved Alerts" status="RESOLVED" />
-    </div>
+        <AlertsSection title="Resolved Alerts" status="RESOLVED" />
+      </div>
+    </Shell>
   );
 }

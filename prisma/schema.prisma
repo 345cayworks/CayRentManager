@@ -299,6 +299,10 @@ model LandlordSubscription {
   currentPeriodEnd DateTime
   nextInvoiceAt DateTime
   gracePeriodEndsAt DateTime?
+  isComplimentary Boolean @default(false)
+  complimentarySeats Int @default(0)
+  trialStartsAt DateTime?
+  trialEndsAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

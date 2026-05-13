@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
+import { isBillingTableMissingError } from '@/lib/billing/safe-query';
 import { SubscriptionInvoiceStatus } from '@prisma/client';
 
 export async function GET(req: Request) {
@@ -8,7 +9,12 @@ export async function GET(req: Request) {
   const customRef = url.searchParams.get('custom_reference') ?? url.searchParams.get('customReference');
 
   if (customRef) {
-    const invoice = await prisma.subscriptionInvoice.findFirst({ where: { OR: [{ fygaroCustomRef: customRef }, { invoiceNumber: customRef }] } });
+    let invoice = null;
+    try {
+      invoice = await prisma.subscriptionInvoice.findFirst({ where: { OR: [{ fygaroCustomRef: customRef }, { invoiceNumber: customRef }] } });
+    } catch (error) {
+      if (!isBillingTableMissingError(error)) throw error;
+    }
     if (invoice) {
       await prisma.subscriptionInvoice.update({
         where: { id: invoice.id },

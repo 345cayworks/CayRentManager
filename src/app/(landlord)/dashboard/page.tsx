@@ -5,13 +5,19 @@ import { getLandlordDashboardMetrics } from '@/lib/finance/dashboard';
 import { SubscriptionStatus } from '@prisma/client';
 import Link from 'next/link';
 import { prisma } from '@/lib/db/prisma';
+import { isBillingTableMissingError } from '@/lib/billing/safe-query';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const { membership } = await getCurrentLandlordWorkspace();
   const metrics = await getLandlordDashboardMetrics(membership.landlordId);
-  const subscription = await prisma.landlordSubscription.findUnique({ where: { landlordId: membership.landlordId }, include: { invoices: { where: { status: { in: ['OPEN', 'OVERDUE', 'PENDING_VERIFICATION'] } }, orderBy: { createdAt: 'desc' }, take: 1 } } });
+  let subscription: any = null;
+  try {
+    subscription = await prisma.landlordSubscription.findUnique({ where: { landlordId: membership.landlordId }, include: { invoices: { where: { status: { in: ['OPEN', 'OVERDUE', 'PENDING_VERIFICATION'] } }, orderBy: { createdAt: 'desc' }, take: 1 } } });
+  } catch (error) {
+    if (!isBillingTableMissingError(error)) throw error;
+  }
 
   return (
     <Shell title={`${membership.landlord.displayName} Dashboard`}>

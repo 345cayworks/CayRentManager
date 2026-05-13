@@ -268,6 +268,18 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
                             Deactivate
                           </button>
                         ) : null}
+
+                        <button
+                          className="w-full rounded px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          onClick={async () => {
+                            const complimentary = window.confirm('Set this landlord as complimentary (free subscription)? Click Cancel for paid/trial.');
+                            const seatsInput = window.prompt('Complementary seats (0 for none):', '0') ?? '0';
+                            const trialInput = complimentary ? '0' : (window.prompt('Free trial days (0 for none):', '14') ?? '0');
+                            await performAction({ action: 'update_subscription_access', targetUserId: landlord.id, isComplimentary: complimentary, complimentarySeats: Number(seatsInput), trialDays: Number(trialInput) });
+                          }}
+                        >
+                          Subscription access
+                        </button>
                         {landlord.status !== 'SUSPENDED' ? (
                           <button
                             className="w-full rounded px-3 py-2 text-left text-sm hover:bg-slate-50"

@@ -13,6 +13,9 @@ import {
 
 type Mode = 'login' | 'signup';
 
+const inputClassName =
+  'w-full rounded border border-slate-300 bg-white px-3 py-2 text-slate-950 placeholder:text-slate-400 outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-navy/20';
+
 function identityPayload(user: any, fullName?: string) {
   return {
     fullName:
@@ -55,6 +58,8 @@ export function IdentityAuthForm({
   const [fullName, setFullName] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordValidation = useMemo(() => {
     if (mode !== 'signup' || password.length === 0) {
@@ -145,15 +150,13 @@ export function IdentityAuthForm({
     <div className="grid gap-4">
       <form onSubmit={submit} className="grid gap-3">
         {mode === 'signup' ? (
-          <>
-            <input
-              required
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              placeholder="Full name"
-              className="border rounded px-3 py-2"
-            />
-          </>
+          <input
+            required
+            value={fullName}
+            onChange={(event) => setFullName(event.target.value)}
+            placeholder="Full name"
+            className={inputClassName}
+          />
         ) : null}
 
         <input
@@ -162,28 +165,50 @@ export function IdentityAuthForm({
           onChange={(event) => setEmail(event.target.value)}
           type="email"
           placeholder="Email"
-          className="border rounded px-3 py-2"
+          className={inputClassName}
         />
 
-        <input
-          required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          type="password"
-          placeholder="Password"
-          className="border rounded px-3 py-2"
-        />
+        <div className="relative">
+          <input
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Password"
+            className={`${inputClassName} pr-20`}
+          />
+
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        </div>
 
         {mode === 'signup' ? (
           <>
-            <input
-              required
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              type="password"
-              placeholder="Confirm password"
-              className="border rounded px-3 py-2"
-            />
+            <div className="relative">
+              <input
+                required
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder="Confirm password"
+                className={`${inputClassName} pr-20`}
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((current) => !current)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+              >
+                {showConfirmPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
               Password requirements:
@@ -215,7 +240,7 @@ export function IdentityAuthForm({
       <button
         onClick={signOut}
         type="button"
-        className="text-sm rounded border px-4 py-2"
+        className="text-sm rounded border px-4 py-2 text-slate-700 hover:bg-slate-50"
       >
         Sign out
       </button>

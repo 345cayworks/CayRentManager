@@ -92,35 +92,84 @@ export async function POST(request: Request) {
         const complimentary = Boolean(body?.isComplimentary);
         const complimentarySeats = Math.max(0, Number(body?.complimentarySeats ?? 0));
         const trialDays = Math.max(0, Number(body?.trialDays ?? 0));
-        const user = await prisma.user.findUnique({ where: { id: userId }, include: { ownedLandlords: true } });
+        const complimentaryReason = body?.complimentaryReason ? String(body.complimentaryReason).trim() : null;
+        const complimentaryUntil = body?.complimentaryUntil ? new Date(String(body.complimentaryUntil)) : null;
+
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          include: { ownedLandlords: true },
+        });
+
         const landlord = user?.ownedLandlords[0];
-        if (!landlord) throw new Error('Landlord workspace not found for user.');
-        const plan = await prisma.subscriptionPlan.findFirst({ where: { status: 'ACTIVE' }, orderBy: { createdAt: 'asc' } });
-        if (!plan) throw new Error('Create at least one subscription plan before assigning access.');
+
+        if (!landlord) {
+          throw new Error('Landlord workspace not found for user.');
+        }
+
+        const plan = await prisma.subscriptionPlan.findFirst({
+          where: { status: 'ACTIVE' },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        if (!plan) {
+          throw new Error(
+            'Create at least one subscription plan before assigning access.'
+          );
+        }
+
         const now = new Date();
-        const trialEndsAt = trialDays > 0 ? new Date(now.getTime() + trialDays * 86_400_000) : null;
+
+        const trialEndsAt =
+          trialDays > 0
+            ? new Date(now.getTime() + trialDays * 86_400_000)
+            : null;
+
+        const resolvedStatus = complimentary
+          ? SubscriptionStatus.COMPLIMENTARY
+          : trialEndsAt
+            ? SubscriptionStatus.TRIAL
+            : SubscriptionStatus.ACTIVE;
+
         const subscription = await prisma.landlordSubscription.upsert({
           where: { landlordId: landlord.id },
           create: {
             landlordId: landlord.id,
             planId: plan.id,
-            status: complimentary ? SubscriptionStatus.ACTIVE : trialEndsAt ? SubscriptionStatus.ACTIVE : SubscriptionStatus.PAST_DUE,
+            status: resolvedStatus,
             isComplimentary: complimentary,
             complimentarySeats,
+            complimentaryReason,
+            complimentaryUntil,
+            complimentaryByUserId: complimentary
+              ? actor.userId
+              : null,
             trialStartsAt: trialEndsAt ? now : null,
             trialEndsAt,
             currentPeriodStart: now,
-            currentPeriodEnd: new Date(now.getTime() + 30 * 86_400_000),
-            nextInvoiceAt: new Date(now.getTime() + 30 * 86_400_000),
+            currentPeriodEnd: new Date(
+              now.getTime() + 30 * 86_400_000
+            ),
+            nextInvoiceAt: complimentary
+              ? null
+              : new Date(now.getTime() + 30 * 86_400_000),
           },
           update: {
+            status: resolvedStatus,
             isComplimentary: complimentary,
             complimentarySeats,
+            complimentaryReason,
+            complimentaryUntil,
+            complimentaryByUserId: complimentary
+              ? actor.userId
+              : null,
             trialStartsAt: trialEndsAt ? now : null,
             trialEndsAt,
-            status: complimentary ? SubscriptionStatus.ACTIVE : trialEndsAt ? SubscriptionStatus.ACTIVE : undefined,
+            nextInvoiceAt: complimentary
+              ? null
+              : new Date(now.getTime() + 30 * 86_400_000),
           },
         });
+
         return NextResponse.json({ ok: true, subscription });
       }
 

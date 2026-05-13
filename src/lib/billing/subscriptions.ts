@@ -1,29 +1,55 @@
 import { Prisma, SubscriptionInvoiceStatus, SubscriptionStatus, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { createFygaroPaymentUrl } from '@/lib/billing/fygaro';
+import {
+  shouldGenerateFygaroPaymentLink,
+  shouldGenerateSubscriptionInvoice,
+} from '@/lib/billing/policy';
 
 export function createSubscriptionInvoiceNumber() {
   return `CRM-INV-${new Date().getUTCFullYear()}-${Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0')}`;
 }
 
 export async function createInvoiceForSubscription(subscriptionId: string, dueDate: Date) {
-  const subscription = await prisma.landlordSubscription.findUnique({ where: { id: subscriptionId }, include: { plan: true } });
+  const subscription = await prisma.landlordSubscription.findUnique({
+    where: { id: subscriptionId },
+    include: { plan: true },
+  });
+
   if (!subscription) throw new Error('Subscription not found.');
+
+  if (!shouldGenerateSubscriptionInvoice(subscription)) {
+    return null;
+  }
+
   const invoiceNumber = createSubscriptionInvoiceNumber();
+  const amount = Number(subscription.plan.amount);
+
   const invoice = await prisma.subscriptionInvoice.create({
     data: {
       subscriptionId: subscription.id,
       landlordId: subscription.landlordId,
       invoiceNumber,
       fygaroCustomRef: invoiceNumber,
-      amount: new Prisma.Decimal(subscription.plan.amount),
+      amount: new Prisma.Decimal(amount),
       currency: process.env.FYGARO_CURRENCY ?? subscription.plan.currency,
       dueDate,
       status: SubscriptionInvoiceStatus.OPEN,
     },
   });
-  const fygaroPaymentUrl = createFygaroPaymentUrl(invoice);
-  return prisma.subscriptionInvoice.update({ where: { id: invoice.id }, data: { fygaroPaymentUrl } });
+
+  const fygaroPaymentUrl = shouldGenerateFygaroPaymentLink({
+    subscription,
+    amount,
+    invoiceStatus: invoice.status,
+  })
+    ? createFygaroPaymentUrl(invoice)
+    : null;
+
+  return prisma.subscriptionInvoice.update({
+    where: { id: invoice.id },
+    data: { fygaroPaymentUrl },
+  });
 }
 
 export async function markSubscriptionPaid(invoiceId: string, providerReference?: string | null, payload?: unknown) {

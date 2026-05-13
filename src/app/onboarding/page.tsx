@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { CheckCircle2, Building2, Home, Users, Wrench } from 'lucide-react';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
@@ -9,25 +8,25 @@ const setupSteps = [
     title: 'Add Your First Property',
     description: 'Create your first property profile and organize your portfolio.',
     href: '/properties/new',
-    icon: Building2,
+    icon: '🏢',
   },
   {
     title: 'Create Units',
     description: 'Add apartments, condos, rooms, or commercial spaces.',
     href: '/units/new',
-    icon: Home,
+    icon: '🏠',
   },
   {
     title: 'Invite Tenants',
     description: 'Add tenants and prepare lease assignments.',
     href: '/tenants/new',
-    icon: Users,
+    icon: '👥',
   },
   {
     title: 'Activate Maintenance Tracking',
     description: 'Enable work orders, maintenance vendors, and operational tracking.',
     href: '/maintenance',
-    icon: Wrench,
+    icon: '🛠️',
   },
 ];
 
@@ -85,7 +84,6 @@ export default async function OnboardingPage() {
 
         <section className="grid gap-4 lg:grid-cols-2">
           {setupSteps.map((step, index) => {
-            const Icon = step.icon;
             const completed =
               (index === 0 && propertyCount > 0) ||
               (index === 1 && unitCount > 0) ||
@@ -99,8 +97,8 @@ export default async function OnboardingPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700">
-                      <Icon className="h-6 w-6" />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-2xl">
+                      {step.icon}
                     </div>
 
                     <div>
@@ -110,7 +108,7 @@ export default async function OnboardingPage() {
                         </h2>
 
                         {completed ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                          <span className="text-emerald-600">✓</span>
                         ) : null}
                       </div>
 

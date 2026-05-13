@@ -4,7 +4,7 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { createAppSession } from '@/lib/auth/session';
 import { syncIdentityUser } from '@/lib/identity/sync';
 
-function getRedirectPath(role: UserRole | string, status: UserStatus | string, mustChangePassword?: boolean) {
+function getRedirectPath(role: UserRole | string, status: UserStatus | string, mustChangePassword?: boolean, createdWorkspace?: boolean) {
   if (status === UserStatus.SUSPENDED || status === 'SUSPENDED') {
     return '/login?error=suspended';
   }
@@ -38,7 +38,7 @@ function getRedirectPath(role: UserRole | string, status: UserStatus | string, m
     case 'LANDLORD':
     case 'PROPERTY_MANAGER':
     case 'ACCOUNTANT':
-      return '/dashboard';
+      return createdWorkspace ? '/onboarding' : '/dashboard';
     default:
       return '/unauthorized';
   }
@@ -80,6 +80,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     user: appUser,
     createdWorkspace,
-    redirectTo: getRedirectPath(appUser.role, appUser.status, appUser.mustChangePassword),
+    redirectTo: getRedirectPath(appUser.role, appUser.status, appUser.mustChangePassword, createdWorkspace),
   });
 }

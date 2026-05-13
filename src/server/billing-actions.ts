@@ -17,6 +17,11 @@ import {
 
 const THIRTY_DAYS_MS = 30 * 86_400_000;
 
+const NON_INVOICEABLE_SUBSCRIPTION_STATUSES: ReadonlySet<SubscriptionStatus> = new Set([
+  SubscriptionStatus.INACTIVE,
+  SubscriptionStatus.CANCELLED,
+]);
+
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
 }
@@ -91,7 +96,7 @@ export async function createSubscriptionInvoiceAction(formData: FormData) {
     throw new Error('Complimentary subscriptions cannot be invoiced.');
   }
 
-  if ([SubscriptionStatus.INACTIVE, SubscriptionStatus.CANCELLED].includes(subscription.status)) {
+  if (NON_INVOICEABLE_SUBSCRIPTION_STATUSES.has(subscription.status)) {
     throw new Error('Inactive or cancelled subscriptions cannot be invoiced.');
   }
 

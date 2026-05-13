@@ -6,6 +6,18 @@ export type BillingSubscriptionPolicyInput = {
   complimentaryUntil?: Date | string | null;
 };
 
+const BILLING_ACCESS_STATUSES: ReadonlySet<SubscriptionStatus> = new Set([
+  SubscriptionStatus.ACTIVE,
+  SubscriptionStatus.TRIAL,
+  SubscriptionStatus.GRACE_PERIOD,
+  SubscriptionStatus.MANUAL_OVERRIDE,
+]);
+
+const FYGARO_PAYABLE_INVOICE_STATUSES: ReadonlySet<SubscriptionInvoiceStatus> = new Set([
+  SubscriptionInvoiceStatus.OPEN,
+  SubscriptionInvoiceStatus.OVERDUE,
+]);
+
 function normalizeDate(value?: Date | string | null) {
   if (!value) return null;
 
@@ -55,12 +67,7 @@ export function hasBillingAccess(
     return true;
   }
 
-  return [
-    SubscriptionStatus.ACTIVE,
-    SubscriptionStatus.TRIAL,
-    SubscriptionStatus.GRACE_PERIOD,
-    SubscriptionStatus.MANUAL_OVERRIDE,
-  ].includes(subscription.status);
+  return BILLING_ACCESS_STATUSES.has(subscription.status);
 }
 
 export function shouldGenerateSubscriptionInvoice(
@@ -102,8 +109,5 @@ export function shouldGenerateFygaroPaymentLink(params: {
     return false;
   }
 
-  return [
-    SubscriptionInvoiceStatus.OPEN,
-    SubscriptionInvoiceStatus.OVERDUE,
-  ].includes(invoiceStatus);
+  return FYGARO_PAYABLE_INVOICE_STATUSES.has(invoiceStatus);
 }

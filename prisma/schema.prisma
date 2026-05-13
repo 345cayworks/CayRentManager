@@ -92,7 +92,10 @@ enum InvoiceStatus {
 }
 
 enum SubscriptionStatus {
+  TRIAL
   ACTIVE
+  COMPLIMENTARY
+  MANUAL_OVERRIDE
   PAST_DUE
   GRACE_PERIOD
   INACTIVE
@@ -297,10 +300,13 @@ model LandlordSubscription {
   status SubscriptionStatus @default(ACTIVE)
   currentPeriodStart DateTime
   currentPeriodEnd DateTime
-  nextInvoiceAt DateTime
+  nextInvoiceAt DateTime?
   gracePeriodEndsAt DateTime?
   isComplimentary Boolean @default(false)
   complimentarySeats Int @default(0)
+  complimentaryReason String?
+  complimentaryUntil DateTime?
+  complimentaryByUserId String?
   trialStartsAt DateTime?
   trialEndsAt DateTime?
   createdAt DateTime @default(now())

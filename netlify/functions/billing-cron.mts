@@ -1,5 +1,5 @@
 import { SubscriptionInvoiceStatus, SubscriptionStatus, UserStatus } from '@prisma/client';
-import { prisma } from '../../src/lib/db';
+import { prisma } from '../../src/lib/db/prisma';
 import { createInvoiceForSubscription } from '../../src/lib/billing/subscriptions';
 
 export default async () => {

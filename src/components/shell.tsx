@@ -7,6 +7,7 @@ const adminLinks = [
   ['/admin', 'Dashboard'],
   ['/admin/users', 'Users'],
   ['/admin/landlords', 'Landlords'],
+  ['/admin/billing', 'Billing'],
   ['/admin/audit', 'Audit'],
 ];
 

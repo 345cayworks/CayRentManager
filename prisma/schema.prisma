@@ -91,6 +91,23 @@ enum InvoiceStatus {
   VOID
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  GRACE_PERIOD
+  INACTIVE
+  CANCELLED
+}
+
+enum SubscriptionInvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  WAIVED
+  OVERDUE
+  PENDING_VERIFICATION
+}
+
 enum PaymentMethodType {
   BANK_TRANSFER
   CASH
@@ -255,6 +272,82 @@ model LandlordProfile {
   messages            Message[]
   auditLogs           AuditLog[]
   leaseAlertSnapshots LeaseAlertSnapshot[]
+  subscriptions       LandlordSubscription[]
+  subscriptionInvoices SubscriptionInvoice[]
+}
+
+model SubscriptionPlan {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  amount Decimal
+  currency String @default("KYD")
+  intervalMonths Int @default(1)
+  status RecordStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions LandlordSubscription[]
+}
+
+model LandlordSubscription {
+  id String @id @default(cuid())
+  landlordId String @unique
+  planId String
+  status SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd DateTime
+  nextInvoiceAt DateTime
+  gracePeriodEndsAt DateTime?
+  isComplimentary Boolean @default(false)
+  complimentarySeats Int @default(0)
+  trialStartsAt DateTime?
+  trialEndsAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+  invoices SubscriptionInvoice[]
+}
+
+model SubscriptionInvoice {
+  id String @id @default(cuid())
+  subscriptionId String
+  landlordId String
+  invoiceNumber String @unique
+  amount Decimal
+  currency String @default("KYD")
+  status SubscriptionInvoiceStatus @default(OPEN)
+  dueDate DateTime
+  paidAt DateTime?
+  waivedAt DateTime?
+  fygaroCustomRef String? @unique
+  fygaroPaymentUrl String?
+  fygaroPaymentId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscription LandlordSubscription @relation(fields: [subscriptionId], references: [id])
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+  paymentEvents BillingPaymentEvent[]
+
+  @@index([subscriptionId, status])
+  @@index([landlordId, status])
+}
+
+model BillingPaymentEvent {
+  id String @id @default(cuid())
+  subscriptionInvoiceId String
+  eventType String
+  provider String @default("FYGARO")
+  providerReference String?
+  payload Json?
+  createdAt DateTime @default(now())
+
+  invoice SubscriptionInvoice @relation(fields: [subscriptionInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionInvoiceId, createdAt])
 }
 
 model LandlordMembership {

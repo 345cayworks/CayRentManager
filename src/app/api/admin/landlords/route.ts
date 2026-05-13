@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { UserRole, UserStatus } from '@prisma/client';
 import { getActiveUser } from '@/lib/auth/guards';
+import { prisma } from '@/lib/db/prisma';
+import { SubscriptionStatus } from '@prisma/client';
 import {
   createLandlordInvite,
   markPasswordResetRequired,
@@ -84,6 +86,44 @@ export async function POST(request: Request) {
         const passwordResult = await setLandlordTemporaryPassword(actor.userId, actor.email, userId, body?.temporaryPassword ? String(body.temporaryPassword).trim() : undefined);
         return NextResponse.json({ ok: true, temporaryPassword: passwordResult.temporaryPassword });
       }
+
+      case 'update_subscription_access': {
+        const userId = String(body?.targetUserId ?? '');
+        const complimentary = Boolean(body?.isComplimentary);
+        const complimentarySeats = Math.max(0, Number(body?.complimentarySeats ?? 0));
+        const trialDays = Math.max(0, Number(body?.trialDays ?? 0));
+        const user = await prisma.user.findUnique({ where: { id: userId }, include: { ownedLandlords: true } });
+        const landlord = user?.ownedLandlords[0];
+        if (!landlord) throw new Error('Landlord workspace not found for user.');
+        const plan = await prisma.subscriptionPlan.findFirst({ where: { status: 'ACTIVE' }, orderBy: { createdAt: 'asc' } });
+        if (!plan) throw new Error('Create at least one subscription plan before assigning access.');
+        const now = new Date();
+        const trialEndsAt = trialDays > 0 ? new Date(now.getTime() + trialDays * 86_400_000) : null;
+        const subscription = await prisma.landlordSubscription.upsert({
+          where: { landlordId: landlord.id },
+          create: {
+            landlordId: landlord.id,
+            planId: plan.id,
+            status: complimentary ? SubscriptionStatus.ACTIVE : trialEndsAt ? SubscriptionStatus.ACTIVE : SubscriptionStatus.PAST_DUE,
+            isComplimentary: complimentary,
+            complimentarySeats,
+            trialStartsAt: trialEndsAt ? now : null,
+            trialEndsAt,
+            currentPeriodStart: now,
+            currentPeriodEnd: new Date(now.getTime() + 30 * 86_400_000),
+            nextInvoiceAt: new Date(now.getTime() + 30 * 86_400_000),
+          },
+          update: {
+            isComplimentary: complimentary,
+            complimentarySeats,
+            trialStartsAt: trialEndsAt ? now : null,
+            trialEndsAt,
+            status: complimentary ? SubscriptionStatus.ACTIVE : trialEndsAt ? SubscriptionStatus.ACTIVE : undefined,
+          },
+        });
+        return NextResponse.json({ ok: true, subscription });
+      }
+
       default:
         return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });
     }

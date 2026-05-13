@@ -1,4 +1,4 @@
-import { InvoiceStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { InvoiceStatus, LeaseStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePaymentBalance, calculatePaymentStatus } from '@/lib/validation/payments';
 
@@ -18,6 +18,13 @@ function createReceiptNumber() {
     .padStart(3, '0');
 
   return `RCT-${timestamp}-${random}`;
+}
+
+function monthRange(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+
+  return { start, end };
 }
 
 export async function createInvoiceForLease(params: {
@@ -58,6 +65,80 @@ export async function createInvoiceForLease(params: {
       notes: params.notes,
     },
   });
+}
+
+export async function generateMonthlyRentInvoices(params: {
+  landlordId: string;
+  dueDate: Date;
+}) {
+  const { start, end } = monthRange(params.dueDate);
+
+  const leases = await prisma.lease.findMany({
+    where: {
+      landlordId: params.landlordId,
+      status: LeaseStatus.ACTIVE,
+      startDate: {
+        lte: params.dueDate,
+      },
+      endDate: {
+        gte: params.dueDate,
+      },
+    },
+    include: {
+      tenant: true,
+      unit: {
+        include: {
+          property: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  });
+
+  let created = 0;
+  let skipped = 0;
+
+  for (const lease of leases) {
+    const existingInvoice = await prisma.invoice.findFirst({
+      where: {
+        landlordId: params.landlordId,
+        leaseId: lease.id,
+        dueDate: {
+          gte: start,
+          lt: end,
+        },
+        status: {
+          not: InvoiceStatus.VOID,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingInvoice) {
+      skipped += 1;
+      continue;
+    }
+
+    await createInvoiceForLease({
+      landlordId: params.landlordId,
+      leaseId: lease.id,
+      dueDate: params.dueDate,
+      amount: lease.rentAmount,
+      notes: `Monthly rent for ${params.dueDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })}`,
+    });
+
+    created += 1;
+  }
+
+  return {
+    created,
+    skipped,
+    eligibleLeases: leases.length,
+  };
 }
 
 export async function applyPaymentToInvoice(params: {

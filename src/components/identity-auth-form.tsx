@@ -1,25 +1,68 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getIdentityErrorMessage } from '@/lib/netlify/identity-errors';
-import { getCurrentIdentityUser, initializeIdentity, login, logout, signup } from '@/lib/netlify/identity-client';
+import {
+  getCurrentIdentityUser,
+  initializeIdentity,
+  login,
+  logout,
+  signup,
+} from '@/lib/netlify/identity-client';
 
 type Mode = 'login' | 'signup';
 
 function identityPayload(user: any, fullName?: string) {
   return {
-    fullName: fullName || user.name || user.user_metadata?.full_name || user.user_metadata?.name || user.email,
+    fullName:
+      fullName ||
+      user.name ||
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email,
   };
 }
 
-export function IdentityAuthForm({ mode, redirectTo = '/unauthorized' }: { mode: Mode; redirectTo?: string }) {
+function validatePassword(password: string) {
+  if (password.length < 8) {
+    return 'Password must be at least 8 characters.';
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must include at least one uppercase letter.';
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return 'Password must include at least one number.';
+  }
+
+  return null;
+}
+
+export function IdentityAuthForm({
+  mode,
+  redirectTo = '/dashboard',
+}: {
+  mode: Mode;
+  redirectTo?: string;
+}) {
   const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const passwordValidation = useMemo(() => {
+    if (mode !== 'signup' || password.length === 0) {
+      return null;
+    }
+
+    return validatePassword(password);
+  }, [mode, password]);
 
   useEffect(() => {
     initializeIdentity()
@@ -44,7 +87,10 @@ export function IdentityAuthForm({ mode, redirectTo = '/unauthorized' }: { mode:
       throw new Error(body.error ?? 'Unable to sync app session.');
     }
 
-    const target = typeof body.redirectTo === 'string' ? body.redirectTo : redirectTo;
+    const target =
+      typeof body.redirectTo === 'string'
+        ? body.redirectTo
+        : redirectTo;
 
     if (window.location.pathname !== target) {
       router.replace(target);
@@ -59,7 +105,27 @@ export function IdentityAuthForm({ mode, redirectTo = '/unauthorized' }: { mode:
     setMessage('');
 
     try {
-      const user = mode === 'signup' ? await signup(email, password, fullName) : await login(email, password);
+      if (mode === 'signup') {
+        if (!fullName.trim()) {
+          throw new Error('Full name is required.');
+        }
+
+        const passwordError = validatePassword(password);
+
+        if (passwordError) {
+          throw new Error(passwordError);
+        }
+
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match.');
+        }
+      }
+
+      const user =
+        mode === 'signup'
+          ? await signup(email, password, fullName)
+          : await login(email, password);
+
       await syncSession(user);
     } catch (error) {
       setMessage(getIdentityErrorMessage(error));
@@ -79,17 +145,81 @@ export function IdentityAuthForm({ mode, redirectTo = '/unauthorized' }: { mode:
     <div className="grid gap-4">
       <form onSubmit={submit} className="grid gap-3">
         {mode === 'signup' ? (
-          <input required value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Full name" className="border rounded px-3 py-2" />
+          <>
+            <input
+              required
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder="Full name"
+              className="border rounded px-3 py-2"
+            />
+          </>
         ) : null}
-        <input required value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="Email" className="border rounded px-3 py-2" />
-        <input required value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="Password" className="border rounded px-3 py-2" />
-        <button disabled={busy} className="rounded bg-brand-navy text-white px-4 py-2 disabled:opacity-60">
-          {busy ? 'Please wait...' : mode === 'signup' ? 'Create account' : 'Sign in'}
+
+        <input
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          type="email"
+          placeholder="Email"
+          className="border rounded px-3 py-2"
+        />
+
+        <input
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          type="password"
+          placeholder="Password"
+          className="border rounded px-3 py-2"
+        />
+
+        {mode === 'signup' ? (
+          <>
+            <input
+              required
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              type="password"
+              placeholder="Confirm password"
+              className="border rounded px-3 py-2"
+            />
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              Password requirements:
+              <ul className="mt-2 list-disc pl-4">
+                <li>At least 8 characters</li>
+                <li>One uppercase letter</li>
+                <li>One number</li>
+              </ul>
+            </div>
+          </>
+        ) : null}
+
+        {passwordValidation ? (
+          <p className="text-xs text-amber-700">{passwordValidation}</p>
+        ) : null}
+
+        <button
+          disabled={busy}
+          className="rounded bg-brand-navy text-white px-4 py-2 disabled:opacity-60"
+        >
+          {busy
+            ? 'Please wait...'
+            : mode === 'signup'
+              ? 'Create account'
+              : 'Sign in'}
         </button>
       </form>
-      <button onClick={signOut} type="button" className="text-sm rounded border px-4 py-2">
+
+      <button
+        onClick={signOut}
+        type="button"
+        className="text-sm rounded border px-4 py-2"
+      >
         Sign out
       </button>
+
       {message ? <p className="text-sm text-red-700">{message}</p> : null}
     </div>
   );

@@ -14,11 +14,11 @@ function base64UrlEncode(input: string) {
 }
 
 export function createFygaroJwt(payload: FygaroJwtPayload) {
-  const publicKey = process.env.FYGARO_PUBLIC_KEY;
+  const keyId = process.env.FYGARO_KID ?? process.env.FYGARO_PUBLIC_KEY;
   const secret = process.env.FYGARO_SECRET_KEY;
-  if (!publicKey || !secret) throw new Error('Fygaro keys are not configured.');
+  if (!keyId || !secret) throw new Error('Fygaro keys are not configured.');
 
-  const header = { alg: 'HS256', typ: 'JWT', kid: publicKey };
+  const header = { alg: 'HS256', typ: 'JWT', kid: keyId };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const signingInput = `${encodedHeader}.${encodedPayload}`;

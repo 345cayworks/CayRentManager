@@ -61,8 +61,8 @@ export default async function AdminBillingPage() {
       landlordName: s.landlord.displayName,
       planName: s.plan.name,
       amountLabel: complimentary
-        ? '$0 Complimentary'
-        : `${Number(s.plan.amount).toFixed(2)} ${s.plan.currency}`,
+        ? 'KYD 0 Complimentary'
+        : `KYD ${Number(s.plan.amount).toFixed(2)}`,
       statusLabel: complimentary ? 'COMPLIMENTARY' : s.status,
       statusClassName: statusClass(s.status, complimentary),
       nextInvoiceLabel: complimentary

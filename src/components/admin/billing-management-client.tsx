@@ -454,7 +454,7 @@ export function BillingManagementClient({
             Monthly Revenue
           </p>
           <p className="mt-1 text-xl font-semibold text-slate-950">
-            ${monthlyRevenue.toFixed(0)}
+            KYD {monthlyRevenue.toFixed(0)}
           </p>
         </div>
 

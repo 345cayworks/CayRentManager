@@ -1,5 +1,8 @@
 # Phase 1 Security QA Checklist
 
+_Manual QA pass required before each Netlify deploy. Items marked **(automated)** are also enforced by the vitest suite; the manual run still confirms the deployed behavior._
+
+
 ## Access Control
 
 - [ ] SUPERADMIN can access admin routes
@@ -26,10 +29,10 @@
 
 ## Bootstrap Route
 
-- [ ] Route disabled by default
-- [ ] Route blocked without environment enablement
+- [ ] Route disabled by default **(automated)**
+- [ ] Route blocked without environment enablement **(automated)**
 - [ ] Route blocked for invalid IPs
-- [ ] Route blocked for invalid master key
+- [ ] Route blocked for invalid master key **(automated)**
 
 ## Payments
 

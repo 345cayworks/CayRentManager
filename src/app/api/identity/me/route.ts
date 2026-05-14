@@ -15,15 +15,15 @@ export async function GET() {
     );
   }
 
+  // Phase 1 policy: expose only the minimum set of safe fields. Internal user
+  // IDs and identity-provider identifiers must not appear in this response.
+  // Server-side guards remain the source of truth for access control.
   return NextResponse.json({
     authenticated: true,
     user: {
-      id: user.userId,
       email: user.email,
       role: user.role,
       status: user.status,
-      mustChangePassword: user.mustChangePassword,
-      name: user.name ?? null,
     },
   });
 }

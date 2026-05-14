@@ -109,7 +109,7 @@ Latest confirmed `main` after registration workflow tightening was merged in PR 
 Status:
 
 ```text
-Mostly complete
+Complete
 ```
 
 Implemented or substantially improved:
@@ -123,13 +123,14 @@ Implemented or substantially improved:
 - no-hard-delete direction for operational records
 - Netlify database migration discipline
 - route and navigation stabilization work
+- automated access-control and workspace-isolation tests
+- tenant invite edge-case tests (expired, mismatch, already-accepted, concurrent claim, disabled account)
+- final bootstrap endpoint policy (env-gated, master-key-gated, optional IP allowlist, timing-safe, audit-logged, 404 when disabled)
+- minimum-field `/api/identity/me` response
 
-Remaining:
+Ongoing operational requirement:
 
-- final automated tests for access control
-- full QA pass for all role redirects
-- stronger tenant invite edge-case tests
-- final bootstrap endpoint policy decision
+- Full manual QA pass for all role redirects before each Netlify deploy, using `tests/security-phase1-checklist.md`.
 
 ---
 

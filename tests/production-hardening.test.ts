@@ -73,16 +73,40 @@ describe('production hardening guardrails', () => {
     }
   });
 
-  it('keeps shell navigation role-aware and hides unfinished workflow links', () => {
+  it('keeps shell navigation role-aware and isolates operational roles', () => {
     const shell = read('src/components/shell.tsx');
 
+    // Navigation must dispatch by role, not be a flat link list.
     expect(shell).toContain('linksForRole');
     expect(shell).toContain('UserRole.SUPERADMIN');
     expect(shell).toContain('UserRole.TENANT');
-    expect(shell).not.toContain("'/maintenance'");
-    expect(shell).not.toContain("'/documents'");
-    expect(shell).not.toContain("'/reports'");
-    expect(shell).not.toContain("'/settings'");
+    expect(shell).toContain('UserRole.LANDLORD');
+
+    // Operational roles (vendor, maintenance provider, concierge, guest) must
+    // route to /unauthorized rather than receive landlord or admin navigation.
+    expect(shell).toContain('UserRole.VENDOR');
+    expect(shell).toContain('UserRole.MAINTENANCE_PROVIDER');
+    expect(shell).toContain('UserRole.CONCIERGE_AGENT');
+    expect(shell).toContain('UserRole.GUEST');
+    expect(shell).toContain("'/unauthorized'");
+
+    // Tenant navigation must never include landlord-only routes.
+    const tenantLinksMatch = shell.match(/const tenantLinks = \[([\s\S]*?)\];/);
+    expect(tenantLinksMatch).not.toBeNull();
+    const tenantLinksBlock = tenantLinksMatch![1];
+    expect(tenantLinksBlock).not.toContain("'/properties'");
+    expect(tenantLinksBlock).not.toContain("'/payments'");
+    expect(tenantLinksBlock).not.toContain("'/expenses'");
+    expect(tenantLinksBlock).not.toContain("'/reports'");
+    expect(tenantLinksBlock).not.toContain("'/admin'");
+
+    // Admin navigation must not bleed into landlord workspace routes.
+    const adminLinksMatch = shell.match(/const adminLinks = \[([\s\S]*?)\];/);
+    expect(adminLinksMatch).not.toBeNull();
+    const adminLinksBlock = adminLinksMatch![1];
+    expect(adminLinksBlock).not.toContain("'/properties'");
+    expect(adminLinksBlock).not.toContain("'/dashboard'");
+    expect(adminLinksBlock).not.toContain("'/tenant/");
   });
 
   it('guards dangerous admin role transitions', () => {

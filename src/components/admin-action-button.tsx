@@ -18,29 +18,34 @@ export function AdminActionButton({
   icon,
   variant = 'neutral',
 }: AdminActionButtonProps) {
-  const baseClasses = 'block rounded-lg bg-white border shadow-sm p-6 hover:shadow-md transition-shadow duration-200';
+  const baseClasses = 'group block rounded-xl bg-white border p-4 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all duration-200';
   const variantClasses = {
-    primary: 'border-blue-200 hover:border-blue-300',
-    neutral: 'border-gray-200 hover:border-gray-300',
-    warning: 'border-yellow-200 hover:border-yellow-300',
-    danger: 'border-red-200 hover:border-red-300',
+    primary: 'border-blue-100 hover:border-blue-300',
+    neutral: 'border-slate-100 hover:border-slate-300',
+    warning: 'border-amber-100 hover:border-amber-300',
+    danger: 'border-red-100 hover:border-red-300',
   };
 
   return (
     <Link href={href} className={`${baseClasses} ${variantClasses[variant]}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            {icon && <span className="text-lg">{icon}</span>}
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          </div>
-          <p className="text-sm text-gray-600 mt-1">{description}</p>
-        </div>
-        {badge && (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            {badge}
+      <div className="flex items-start gap-3">
+        {icon ? (
+          <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-base ring-1 ring-slate-100 group-hover:bg-slate-100">
+            {icon}
           </span>
-        )}
+        ) : null}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="truncate text-sm font-semibold text-slate-950">{title}</h3>
+            {badge !== undefined && badge !== null ? (
+              <span className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                {badge}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{description}</p>
+        </div>
       </div>
     </Link>
   );

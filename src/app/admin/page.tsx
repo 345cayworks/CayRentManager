@@ -18,71 +18,79 @@ export default async function Page() {
     {
       href: '/admin/users',
       title: 'Manage Users',
-      description: 'Review roles, disabled accounts, and platform access.',
+      description: 'Roles, disabled accounts, and platform access.',
       badge: users,
       icon: '👥',
     },
     {
       href: '/admin/landlords',
       title: 'Manage Landlords',
-      description: 'View landlord workspaces and portfolio ownership.',
+      description: 'Workspaces, account status, and owner tools.',
       badge: landlords,
       icon: '🏢',
     },
     {
+      href: '/admin/billing',
+      title: 'Billing',
+      description: 'Subscriptions, invoices, and complimentary access.',
+      icon: '💳',
+    },
+    {
       href: '/admin/audit',
       title: 'Audit Logs',
-      description: 'Review recent platform activity and admin actions.',
+      description: 'Recent platform activity and admin actions.',
       icon: '📋',
     },
     {
       href: '/financials',
       title: 'Financial Overview',
-      description: 'Inspect portfolio rent, expenses, balances, and cashflow.',
+      description: 'Rent, expenses, balances, and cashflow.',
       icon: '💰',
     },
     {
       href: '/financials/rent-roll',
       title: 'Rent Roll',
-      description: 'View detailed rent collection and tenant payments.',
+      description: 'Rent collection and tenant payments.',
       icon: '📊',
     },
     {
       href: '/api/health',
       title: 'Health Check',
-      description: 'Check system status and database connectivity.',
+      description: 'System status and database connectivity.',
       icon: '❤️',
     },
     {
       href: '/api/identity/me',
       title: 'Current Session',
-      description: 'View your current authentication session details.',
+      description: 'Authentication session details.',
       icon: '🔐',
     },
   ];
 
   return (
     <Shell title="Superadmin Dashboard">
-      <div className="space-y-8">
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Platform Overview</h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            {[
-              ['Users', users],
-              ['Landlord Workspaces', landlords],
-              ['Disabled Users', disabledUsers],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl bg-white border shadow-sm p-6">
-                <p className="text-sm text-slate-500">{label}</p>
-                <p className="text-3xl font-semibold mt-2">{value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="space-y-6">
+        <section className="grid gap-3 md:grid-cols-3">
+          {[
+            ['Users', users],
+            ['Landlord Workspaces', landlords],
+            ['Disabled Users', disabledUsers],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-950">{value}</p>
+            </div>
+          ))}
+        </section>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section>
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">Quick Actions</h2>
+              <p className="text-xs text-slate-500">Compact admin shortcuts for the most common control tasks.</p>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {actions.map((action) => (
               <AdminActionButton
                 key={action.href}
@@ -94,7 +102,7 @@ export default async function Page() {
               />
             ))}
           </div>
-        </div>
+        </section>
       </div>
     </Shell>
   );

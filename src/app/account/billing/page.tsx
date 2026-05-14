@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { SubscriptionInvoiceStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
-import { requireLandlordWorkspace } from '@/lib/auth/guards';
+import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { isBillingTableMissingError } from '@/lib/billing/safe-query';
 import { isComplimentarySubscription } from '@/lib/billing/policy';
@@ -13,13 +13,22 @@ function statusBadge(status: string) {
     GRACE_PERIOD: 'bg-amber-50 text-amber-700 border-amber-100',
     PAST_DUE: 'bg-red-50 text-red-700 border-red-100',
     TRIAL: 'bg-violet-50 text-violet-700 border-violet-100',
+    PAID: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    WAIVED: 'bg-slate-50 text-slate-700 border-slate-200',
+    OPEN: 'bg-blue-50 text-blue-700 border-blue-100',
+    OVERDUE: 'bg-red-50 text-red-700 border-red-100',
   };
 
   return styles[status] ?? 'bg-slate-50 text-slate-700 border-slate-200';
 }
 
+const payableInvoiceStatuses: ReadonlySet<SubscriptionInvoiceStatus> = new Set([
+  SubscriptionInvoiceStatus.OPEN,
+  SubscriptionInvoiceStatus.OVERDUE,
+]);
+
 export default async function AccountBillingPage() {
-  const workspace = await requireLandlordWorkspace();
+  const workspace = await getCurrentLandlordWorkspace();
 
   let subscription: any = null;
   let invoices: any[] = [];
@@ -57,7 +66,7 @@ export default async function AccountBillingPage() {
     : false;
 
   const outstandingInvoice = invoices.find((invoice) =>
-    [SubscriptionInvoiceStatus.OPEN, SubscriptionInvoiceStatus.OVERDUE].includes(invoice.status),
+    payableInvoiceStatuses.has(invoice.status),
   );
 
   return (
@@ -253,8 +262,7 @@ export default async function AccountBillingPage() {
                           </td>
 
                           <td className="px-4 py-4">
-                            {invoice.fygaroPaymentUrl &&
-                            [SubscriptionInvoiceStatus.OPEN, SubscriptionInvoiceStatus.OVERDUE].includes(invoice.status) ? (
+                            {invoice.fygaroPaymentUrl && payableInvoiceStatuses.has(invoice.status) ? (
                               <Link
                                 href={invoice.fygaroPaymentUrl}
                                 className="text-sm text-blue-600 hover:underline"

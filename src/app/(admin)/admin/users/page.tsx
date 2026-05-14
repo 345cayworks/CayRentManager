@@ -2,7 +2,7 @@ import { Shell } from '@/components/shell';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { assignUserRoleAction, disableUserAction, reactivateUserAction } from '@/server/actions';
-import { UserRole } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,9 +23,9 @@ export default async function Page() {
   await requireSuperadmin();
   const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
 
-  const activeCount = users.filter((user) => user.status === 'ACTIVE').length;
-  const disabledCount = users.filter((user) => user.status === 'DISABLED').length;
-  const landlordCount = users.filter((user) => user.role === 'LANDLORD').length;
+  const activeCount = users.filter((user) => user.status === UserStatus.ACTIVE).length;
+  const disabledCount = users.filter((user) => user.status === UserStatus.DISABLED).length;
+  const landlordCount = users.filter((user) => user.role === UserRole.LANDLORD).length;
 
   return (
     <Shell title="Superadmin Users">
@@ -90,10 +90,10 @@ export default async function Page() {
                         </form>
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        <form action={user.status === 'DISABLED' ? reactivateUserAction : disableUserAction}>
+                        <form action={user.status === UserStatus.DISABLED ? reactivateUserAction : disableUserAction}>
                           <input type="hidden" name="userId" value={user.id} />
                           <button className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                            {user.status === 'DISABLED' ? 'Reactivate' : 'Disable'}
+                            {user.status === UserStatus.DISABLED ? 'Reactivate' : 'Disable'}
                           </button>
                         </form>
                       </td>

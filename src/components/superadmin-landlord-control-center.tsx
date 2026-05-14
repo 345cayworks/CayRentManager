@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserStatus } from '@prisma/client';
 
@@ -91,7 +91,7 @@ function ModalShell({
   title: string;
   description?: string;
   onClose: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
   maxWidth?: string;
 }) {
   return (
@@ -245,7 +245,7 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
     if (result?.ok) closeModal();
   }
 
-  async function handleInvite(event: React.FormEvent<HTMLFormElement>) {
+  async function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = await performAction({
       action: 'invite',

@@ -2,6 +2,44 @@
 -- This migration is intentionally defensive because some billing enums/models were added
 -- to schema.prisma before the production database received the physical tables.
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type
+    WHERE typname = 'SubscriptionStatus'
+  ) THEN
+    CREATE TYPE "SubscriptionStatus" AS ENUM (
+      'TRIAL',
+      'ACTIVE',
+      'COMPLIMENTARY',
+      'MANUAL_OVERRIDE',
+      'PAST_DUE',
+      'GRACE_PERIOD',
+      'INACTIVE',
+      'CANCELLED'
+    );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type
+    WHERE typname = 'SubscriptionInvoiceStatus'
+  ) THEN
+    CREATE TYPE "SubscriptionInvoiceStatus" AS ENUM (
+      'DRAFT',
+      'OPEN',
+      'PAID',
+      'WAIVED',
+      'OVERDUE',
+      'PENDING_VERIFICATION'
+    );
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS "SubscriptionPlan" (
   "id" TEXT NOT NULL,
   "code" TEXT NOT NULL,

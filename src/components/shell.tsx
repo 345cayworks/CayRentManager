@@ -13,6 +13,7 @@ const adminLinks = [
 
 const landlordLinks = [
   ['/dashboard', 'Dashboard'],
+  ['/onboarding', 'Onboarding'],
   ['/alerts', 'Alerts'],
   ['/properties', 'Properties'],
   ['/units', 'Units'],

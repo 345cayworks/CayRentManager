@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { IdentityAuthForm } from '@/components/identity-auth-form';
 
 export default function RegisterPage() {
@@ -7,7 +8,9 @@ export default function RegisterPage() {
       <div className="max-w-xl mx-auto rounded-xl bg-white border shadow-sm p-6">
         <h1 className="text-2xl font-semibold">Create landlord workspace</h1>
         <div className="mt-6">
-          <IdentityAuthForm mode="signup" />
+          <Suspense fallback={<div className="text-sm text-slate-400">Loading...</div>}>
+            <IdentityAuthForm mode="signup" />
+          </Suspense>
         </div>
         <Link href="/login" className="block text-sm text-slate-600 mt-4">Already registered? Sign in</Link>
       </div>

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { IdentityAuthForm } from '@/components/identity-auth-form';
 
 const highlights = [
@@ -54,7 +55,9 @@ export default function LoginPage() {
             </div>
 
             <div className="rounded-2xl bg-slate-950/40 p-4 sm:p-5">
-              <IdentityAuthForm mode="login" />
+              <Suspense fallback={<div className="text-sm text-slate-400">Loading...</div>}>
+                <IdentityAuthForm mode="login" />
+              </Suspense>
             </div>
 
             <div className="mt-6 grid gap-3 text-sm text-slate-300 sm:flex sm:flex-row sm:items-center sm:justify-between">

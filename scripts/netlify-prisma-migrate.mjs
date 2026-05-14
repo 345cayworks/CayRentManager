@@ -3,6 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import { getConnectionString } from '@netlify/database';
 
 const migrationPath = 'prisma/migrations/20260428000000_init/migration.sql';
+const BILLING_FOUNDATION_MIGRATION = '20260513_billing_foundation';
 
 console.log('Preparing Prisma migration deploy.');
 console.log(`Migration file present: ${existsSync(migrationPath)}`);
@@ -28,13 +29,32 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const result = spawnSync('npx', ['prisma', 'migrate', 'deploy'], {
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-  env: {
-    ...process.env,
-    DATABASE_URL: databaseUrl,
-  },
-});
+function runPrismaCommand(args) {
+  return spawnSync('npx', ['prisma', ...args], {
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+    env: {
+      ...process.env,
+      DATABASE_URL: databaseUrl,
+    },
+  });
+}
 
-process.exit(result.status ?? 1);
+console.log('Resolving previously failed billing migration if necessary.');
+
+const resolveResult = runPrismaCommand([
+  'migrate',
+  'resolve',
+  '--rolled-back',
+  BILLING_FOUNDATION_MIGRATION,
+]);
+
+if ((resolveResult.status ?? 1) === 0) {
+  console.log(`Resolved migration state for ${BILLING_FOUNDATION_MIGRATION}.`);
+} else {
+  console.log('No failed billing migration state needed resolution.');
+}
+
+const deployResult = runPrismaCommand(['migrate', 'deploy']);
+
+process.exit(deployResult.status ?? 1);

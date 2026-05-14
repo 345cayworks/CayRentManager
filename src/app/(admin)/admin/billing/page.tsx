@@ -47,9 +47,14 @@ export default async function AdminBillingPage() {
   const activeSubscribers = subs.filter((s) => s.status === 'ACTIVE').length;
   const complimentaryCount = subs.filter((s) => isComplimentarySubscription(s)).length;
   const overdueCount = subs.filter((s) => ['GRACE_PERIOD', 'INACTIVE'].includes(s.status)).length;
+
+  // Expected MRR: sum SubscriptionPlan.amount across ACTIVE paid subscriptions only.
+  // Excludes complimentary, cancelled, inactive, past-due. Fygaro is never the
+  // pricing source here — plan.amount is the platform's source of truth.
+  const EXPECTED_MRR_STATUSES = new Set(['ACTIVE', 'TRIAL']);
   const monthlyRevenue = subs
-    .filter((s) => !isComplimentarySubscription(s))
-    .reduce((sum, s) => sum + Number(s.plan.amount), 0);
+    .filter((s) => EXPECTED_MRR_STATUSES.has(s.status) && !isComplimentarySubscription(s))
+    .reduce((sum, s) => sum + Number(s.plan?.amount ?? 0), 0);
 
   // Build serialized rows for client component
   const rows = subs.map((s) => {

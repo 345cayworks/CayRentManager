@@ -17,14 +17,28 @@ export async function createInvoiceForSubscription(subscriptionId: string, dueDa
   });
 
   if (!subscription) throw new Error('Subscription not found.');
+  if (!subscription.plan) {
+    throw new Error('Subscription has no assigned plan; cannot create an invoice.');
+  }
 
   if (!shouldGenerateSubscriptionInvoice(subscription)) {
     return null;
   }
 
-  const invoiceNumber = createSubscriptionInvoiceNumber();
   const amount = Number(subscription.plan.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Assigned plan has an invalid amount; refusing to create an invoice.');
+  }
 
+  const currency = subscription.plan.currency;
+  if (!currency || currency.trim().length === 0) {
+    throw new Error('Assigned plan has no currency; refusing to create an invoice.');
+  }
+
+  const invoiceNumber = createSubscriptionInvoiceNumber();
+
+  // Snapshot plan amount and currency into the invoice. Future plan price
+  // changes must not retroactively affect already-issued invoices.
   const invoice = await prisma.subscriptionInvoice.create({
     data: {
       subscriptionId: subscription.id,
@@ -32,7 +46,7 @@ export async function createInvoiceForSubscription(subscriptionId: string, dueDa
       invoiceNumber,
       fygaroCustomRef: invoiceNumber,
       amount: new Prisma.Decimal(amount),
-      currency: process.env.FYGARO_CURRENCY ?? subscription.plan.currency,
+      currency,
       dueDate,
       status: SubscriptionInvoiceStatus.OPEN,
     },

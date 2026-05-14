@@ -569,10 +569,10 @@ Potential streams:
 Possible Cayman price bands:
 
 ```text
-Verified listing: CI$49–CI$149/month
-Featured listing: CI$99–CI$299/month
-Category exclusivity: CI$500–CI$1,500/month
-Lead fee: CI$10–CI$25 per qualified inquiry
+Verified listing: KYD $49–KYD $149/month
+Featured listing: KYD $99–KYD $299/month
+Category exclusivity: KYD $500–KYD $1,500/month
+Lead fee: KYD $10–KYD $25 per qualified inquiry
 Concierge dispatch: 5%–15% of work order value
 ```
 

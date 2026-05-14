@@ -177,7 +177,7 @@ END $$;
 -- Seed default plans so SuperAdmin subscription assignment has something usable immediately.
 INSERT INTO "SubscriptionPlan" ("id", "code", "name", "amount", "currency", "intervalMonths", "status", "createdAt", "updatedAt")
 VALUES
-  ('plan_starter_default', 'STARTER', 'Starter Landlord', 29, 'KYD', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  ('plan_starter_default', 'STARTER', 'Starter Landlord', 49, 'KYD', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
   ('plan_professional_default', 'PROFESSIONAL', 'Professional Landlord', 79, 'KYD', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
   ('plan_property_manager_default', 'PROPERTY_MANAGER', 'Property Manager', 149, 'KYD', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("code") DO NOTHING;

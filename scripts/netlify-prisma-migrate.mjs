@@ -29,10 +29,11 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-function runPrismaCommand(args) {
+function runPrismaCommand(args, options = {}) {
   return spawnSync('npx', ['prisma', ...args], {
-    stdio: 'inherit',
+    stdio: options.stdio ?? 'inherit',
     shell: process.platform === 'win32',
+    encoding: options.stdio === 'pipe' ? 'utf8' : undefined,
     env: {
       ...process.env,
       DATABASE_URL: databaseUrl,
@@ -40,19 +41,36 @@ function runPrismaCommand(args) {
   });
 }
 
-console.log('Resolving previously failed billing migration if necessary.');
+function hasFailedBillingMigration(statusResult) {
+  const output = `${statusResult.stdout ?? ''}\n${statusResult.stderr ?? ''}`;
+  return (
+    output.includes(BILLING_FOUNDATION_MIGRATION) &&
+    /failed|P3009|P3018/i.test(output)
+  );
+}
 
-const resolveResult = runPrismaCommand([
-  'migrate',
-  'resolve',
-  '--rolled-back',
-  BILLING_FOUNDATION_MIGRATION,
-]);
+console.log('Checking Prisma migration status before deploy.');
 
-if ((resolveResult.status ?? 1) === 0) {
-  console.log(`Resolved migration state for ${BILLING_FOUNDATION_MIGRATION}.`);
+const statusResult = runPrismaCommand(['migrate', 'status'], { stdio: 'pipe' });
+
+if (hasFailedBillingMigration(statusResult)) {
+  console.log(`Detected failed migration state for ${BILLING_FOUNDATION_MIGRATION}; resolving as rolled back before deploy.`);
+
+  const resolveResult = runPrismaCommand([
+    'migrate',
+    'resolve',
+    '--rolled-back',
+    BILLING_FOUNDATION_MIGRATION,
+  ]);
+
+  if ((resolveResult.status ?? 1) !== 0) {
+    console.error(`Unable to resolve failed migration state for ${BILLING_FOUNDATION_MIGRATION}.`);
+    process.exit(resolveResult.status ?? 1);
+  }
+} else if ((statusResult.status ?? 0) !== 0) {
+  console.log('Prisma migration status returned a non-zero result, but no failed billing migration marker was detected. Continuing to migrate deploy so Prisma can report the authoritative error if deploy fails.');
 } else {
-  console.log('No failed billing migration state needed resolution.');
+  console.log('No failed billing migration state detected.');
 }
 
 const deployResult = runPrismaCommand(['migrate', 'deploy']);

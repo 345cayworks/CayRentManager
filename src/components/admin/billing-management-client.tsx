@@ -451,11 +451,12 @@ export function BillingManagementClient({
 
         <div className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-            Monthly Revenue
+            Expected MRR
           </p>
           <p className="mt-1 text-xl font-semibold text-slate-950">
             KYD {monthlyRevenue.toFixed(0)}
           </p>
+          <p className="mt-1 text-[10px] text-slate-400">Active paid subscriptions</p>
         </div>
 
         <div className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">

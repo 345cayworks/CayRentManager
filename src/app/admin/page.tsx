@@ -30,21 +30,15 @@ export default async function Page() {
       icon: '🏢',
     },
     {
-      href: '/admin/billing',
-      title: 'Billing',
-      description: 'Subscriptions, invoices, and complimentary access.',
-      icon: '💳',
-    },
-    {
       href: '/admin/audit',
       title: 'Audit Logs',
       description: 'Recent platform activity and admin actions.',
       icon: '📋',
     },
     {
-      href: '/financials',
-      title: 'Financial Overview',
-      description: 'Rent, expenses, balances, and cashflow.',
+      href: '/admin/billing',
+      title: 'Platform Financials',
+      description: 'Subscription revenue, paid invoices, outstanding billing, and complimentary accounts.',
       icon: '💰',
     },
     {

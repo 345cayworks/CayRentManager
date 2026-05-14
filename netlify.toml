@@ -4,6 +4,3 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-
-[functions."billing-cron"]
-  schedule = "@daily"

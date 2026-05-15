@@ -327,36 +327,33 @@ At least one number
 Status:
 
 ```text
-Foundation implemented
+Complete
 ```
 
 Implemented:
 
-- new landlord onboarding route
+- new landlord onboarding route with progress hero, dismiss, restore, and mark-complete actions
 - first-login onboarding redirect when a workspace is created
-- onboarding progress cards
-- setup milestones
-- property/unit/tenant/maintenance starter flow
-- setup progress count
+- dedicated `/onboarding/company-profile` wizard that captures contact, address, branding, and operational defaults
+- dedicated `/properties/new`, `/units/new`, and `/tenants/new` guided wizards with save-and-continue flow
+- onboarding completion persistence (`onboardingCompletedAt` / `onboardingCompletedBy`)
+- skip/dismiss onboarding preference (`onboardingDismissedAt` / `onboardingDismissedBy`)
+- dashboard onboarding nudge card and sidebar `Onboarding` badge with remaining count
 
 Current onboarding milestones:
 
 ```text
+Complete company profile
 Add first property
 Create units
 Invite tenants
 Activate maintenance tracking
 ```
 
-Remaining:
+Future enhancements (out of scope for Phase 2 closeout):
 
-- company profile setup wizard
-- `/properties/new` dedicated first-property wizard
-- `/units/new` dedicated guided unit flow
-- `/tenants/new` invite-first-tenant flow
-- onboarding completion persistence
-- skip/dismiss onboarding preference
-- onboarding checklist badges in dashboard
+- onboarding analytics and per-milestone funnel reporting
+- logo file uploads (currently logo is a URL field)
 
 ---
 

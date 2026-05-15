@@ -80,6 +80,186 @@ export async function registerLandlordAction(formData: FormData) {
   redirect('/login?registered=landlord');
 }
 
+export async function updateCompanyProfileAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const displayName = requiredText(formData, 'displayName');
+  const companyName = requiredText(formData, 'companyName');
+
+  await prisma.landlordProfile.update({
+    where: { id: landlordId },
+    data: {
+      displayName,
+      companyName,
+      email: text(formData, 'email') || null,
+      phone: text(formData, 'phone') || null,
+      website: text(formData, 'website') || null,
+      addressLine1: text(formData, 'addressLine1') || null,
+      addressLine2: text(formData, 'addressLine2') || null,
+      city: text(formData, 'city') || null,
+      country: text(formData, 'country') || 'KY',
+      currency: text(formData, 'currency') || 'KYD',
+      timezone: text(formData, 'timezone') || 'America/Cayman',
+      tagline: text(formData, 'tagline') || null,
+      logoUrl: text(formData, 'logoUrl') || null,
+      companyProfileCompletedAt: new Date(),
+    },
+  });
+  await audit(user.userId, user.email, 'landlord.profile_updated', 'LandlordProfile', landlordId, landlordId);
+  revalidatePath('/onboarding');
+  revalidatePath('/onboarding/company-profile');
+  revalidatePath('/dashboard');
+  revalidatePath('/account/profile');
+}
+
+export async function markOnboardingCompleteAction() {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  await prisma.landlordProfile.update({
+    where: { id: landlordId },
+    data: {
+      onboardingCompletedAt: new Date(),
+      onboardingCompletedBy: user.userId,
+      onboardingDismissedAt: null,
+      onboardingDismissedBy: null,
+    },
+  });
+  await audit(user.userId, user.email, 'onboarding.completed', 'LandlordProfile', landlordId, landlordId);
+  revalidatePath('/onboarding');
+  revalidatePath('/dashboard');
+}
+
+export async function dismissOnboardingAction() {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  await prisma.landlordProfile.update({
+    where: { id: landlordId },
+    data: {
+      onboardingDismissedAt: new Date(),
+      onboardingDismissedBy: user.userId,
+    },
+  });
+  await audit(user.userId, user.email, 'onboarding.dismissed', 'LandlordProfile', landlordId, landlordId);
+  revalidatePath('/onboarding');
+  revalidatePath('/dashboard');
+}
+
+export async function restoreOnboardingAction() {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  await prisma.landlordProfile.update({
+    where: { id: landlordId },
+    data: {
+      onboardingDismissedAt: null,
+      onboardingDismissedBy: null,
+      onboardingCompletedAt: null,
+      onboardingCompletedBy: null,
+    },
+  });
+  await audit(user.userId, user.email, 'onboarding.restored', 'LandlordProfile', landlordId, landlordId);
+  revalidatePath('/onboarding');
+  revalidatePath('/dashboard');
+}
+
+export async function createPropertyGuidedAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const purchasePriceInput = text(formData, 'purchasePrice');
+  const estimatedValueInput = text(formData, 'estimatedValue');
+  const property = await prisma.property.create({
+    data: {
+      landlordId,
+      name: requiredText(formData, 'name'),
+      address: requiredText(formData, 'address'),
+      city: requiredText(formData, 'city'),
+      state: requiredText(formData, 'state'),
+      country: text(formData, 'country') || 'KY',
+      propertyType: text(formData, 'propertyType') || 'Residential',
+      purchasePrice: purchasePriceInput ? positiveNumber(purchasePriceInput, 'Purchase price') : null,
+      estimatedValue: estimatedValueInput ? positiveNumber(estimatedValueInput, 'Estimated value') : null,
+    },
+  });
+  await audit(user.userId, user.email, 'property.created', 'Property', property.id, landlordId, { source: 'onboarding_wizard' });
+  revalidatePath('/properties');
+  revalidatePath('/dashboard');
+  revalidatePath('/onboarding');
+
+  const next = text(formData, 'nextStep');
+  if (next === 'units') redirect(`/units/new?propertyId=${property.id}`);
+  if (next === 'onboarding') redirect('/onboarding');
+  redirect(`/properties/${property.id}`);
+}
+
+export async function createUnitGuidedAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const propertyId = requiredText(formData, 'propertyId');
+  await requireOwnedProperty(landlordId, propertyId);
+
+  const bedroomsInput = text(formData, 'bedrooms');
+  const bathroomsInput = text(formData, 'bathrooms');
+  const squareFeetInput = text(formData, 'squareFeet');
+  const depositInput = text(formData, 'depositAmount');
+
+  const unit = await prisma.unit.create({
+    data: {
+      landlordId,
+      propertyId,
+      unitName: requiredText(formData, 'unitName'),
+      bedrooms: bedroomsInput ? Number(bedroomsInput) : null,
+      bathrooms: bathroomsInput ? bathroomsInput : null,
+      squareFeet: squareFeetInput ? Number(squareFeetInput) : null,
+      rentAmount: positiveNumber(money(formData, 'rentAmount'), 'Rent amount'),
+      depositAmount: depositInput ? depositInput : null,
+    },
+  });
+  await audit(user.userId, user.email, 'unit.created', 'Unit', unit.id, landlordId, { source: 'onboarding_wizard' });
+  revalidatePath('/units');
+  revalidatePath('/dashboard');
+  revalidatePath('/onboarding');
+
+  const next = text(formData, 'nextStep');
+  if (next === 'tenants') redirect('/tenants/new');
+  if (next === 'onboarding') redirect('/onboarding');
+  redirect(`/units/${unit.id}`);
+}
+
+export async function createTenantGuidedAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const mode = text(formData, 'mode') || 'invite';
+  const propertyId = text(formData, 'propertyId') || undefined;
+  const unitId = text(formData, 'unitId') || undefined;
+  if (propertyId) await requireOwnedProperty(landlordId, propertyId);
+  if (unitId) await requireOwnedUnit(landlordId, unitId);
+
+  if (mode === 'manual') {
+    const fullName = requiredText(formData, 'fullName');
+    const email = requiredText(formData, 'email').toLowerCase();
+    const tenant = await prisma.tenant.create({
+      data: {
+        landlordId,
+        fullName,
+        email,
+        phone: text(formData, 'phone') || null,
+        employer: text(formData, 'employer') || null,
+        emergencyContactName: text(formData, 'emergencyContactName') || null,
+        emergencyContactPhone: text(formData, 'emergencyContactPhone') || null,
+      },
+    });
+    await audit(user.userId, user.email, 'tenant.created', 'Tenant', tenant.id, landlordId, { source: 'onboarding_wizard' });
+    revalidatePath('/tenants');
+    revalidatePath('/dashboard');
+    revalidatePath('/onboarding');
+    const next = text(formData, 'nextStep');
+    if (next === 'onboarding') redirect('/onboarding');
+    redirect(`/tenants/${tenant.id}`);
+  }
+
+  // mode === 'invite'
+  const email = requiredText(formData, 'email');
+  const invitation = await createTenantInvitation(landlordId, email, propertyId, unitId);
+  await audit(user.userId, user.email, 'tenant.invited', 'TenantInvitation', invitation.id, landlordId, { email: invitation.email, source: 'onboarding_wizard' });
+  revalidatePath('/tenants');
+  revalidatePath('/onboarding');
+  const next = text(formData, 'nextStep');
+  if (next === 'onboarding') redirect('/onboarding');
+  redirect('/tenants');
+}
+
 export async function createPropertyAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
   const property = await prisma.property.create({

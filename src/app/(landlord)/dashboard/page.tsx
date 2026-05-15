@@ -1,7 +1,9 @@
 import { LandlordDashboardOverview } from '@/components/landlord-dashboard';
+import { OnboardingNudge } from '@/components/onboarding/dashboard-nudge';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { getLandlordDashboardMetrics } from '@/lib/finance/dashboard';
+import { getOnboardingState } from '@/lib/onboarding/state';
 import { SubscriptionStatus } from '@prisma/client';
 import Link from 'next/link';
 import { prisma } from '@/lib/db/prisma';
@@ -11,7 +13,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const { membership } = await getCurrentLandlordWorkspace();
-  const metrics = await getLandlordDashboardMetrics(membership.landlordId);
+  const [metrics, onboardingState] = await Promise.all([
+    getLandlordDashboardMetrics(membership.landlordId),
+    getOnboardingState(membership.landlordId).catch(() => null),
+  ]);
   let subscription: any = null;
   try {
     subscription = await prisma.landlordSubscription.findUnique({ where: { landlordId: membership.landlordId }, include: { invoices: { where: { status: { in: ['OPEN', 'OVERDUE', 'PENDING_VERIFICATION'] } }, orderBy: { createdAt: 'desc' }, take: 1 } } });
@@ -27,6 +32,7 @@ export default async function DashboardPage() {
           {subscription.invoices[0]?.fygaroPaymentUrl && <Link className="ml-3 underline" href={subscription.invoices[0].fygaroPaymentUrl}>Pay Now</Link>}
         </div>
       )}
+      {onboardingState ? <OnboardingNudge state={onboardingState} /> : null}
       <LandlordDashboardOverview metrics={metrics} />
       <div className="mt-4 rounded-xl bg-white border shadow-sm p-6">
         <h3 className="font-semibold">Workspace</h3>

@@ -3,6 +3,7 @@ import { LeaseAlertSnapshotStatus, RecordStatus, UserRole } from '@prisma/client
 import { getActiveUser, getUserLandlordMemberships } from '@/lib/auth/guards';
 import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
 import { prisma } from '@/lib/db/prisma';
+import { getOnboardingState } from '@/lib/onboarding/state';
 import { SignOutPanel } from '@/components/sign-out-panel';
 
 type NavLink = { href: string; label: string; badge?: number };
@@ -81,11 +82,28 @@ async function landlordLinksWithAlertBadge(userId: string): Promise<NavLink[]> {
     return baseLandlordLinks;
   }
 
-  if (activeAlertCount === 0) return baseLandlordLinks;
+  let onboardingBadge = 0;
+  try {
+    const state = await getOnboardingState(landlordId);
+    if (state.shouldNudge && state.remainingCount > 0) {
+      onboardingBadge = state.remainingCount;
+    }
+  } catch {
+    // Onboarding state unreachable → render nav without the badge.
+    onboardingBadge = 0;
+  }
 
-  return baseLandlordLinks.map((link) =>
-    link.href === '/alerts' ? { ...link, badge: activeAlertCount } : link,
-  );
+  if (activeAlertCount === 0 && onboardingBadge === 0) return baseLandlordLinks;
+
+  return baseLandlordLinks.map((link) => {
+    if (link.href === '/alerts' && activeAlertCount > 0) {
+      return { ...link, badge: activeAlertCount };
+    }
+    if (link.href === '/onboarding' && onboardingBadge > 0) {
+      return { ...link, badge: onboardingBadge };
+    }
+    return link;
+  });
 }
 
 async function linksForRole(role: UserRole | undefined, userId: string | undefined): Promise<NavLink[]> {

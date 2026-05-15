@@ -9,6 +9,7 @@ const adminLinks = [
   ['/admin/landlords', 'Landlords'],
   ['/admin/billing', 'Billing'],
   ['/admin/audit', 'Audit'],
+  ['/account/profile', 'Profile'],
 ];
 
 const landlordLinks = [
@@ -22,6 +23,7 @@ const landlordLinks = [
   ['/payments', 'Rent Payments'],
   ['/payments/settings', 'Rent Payment Settings'],
   ['/account/billing', 'Account Billing'],
+  ['/account/profile', 'Profile'],
   ['/maintenance', 'Maintenance'],
   ['/expenses', 'Expenses'],
   ['/documents', 'Documents'],
@@ -31,6 +33,7 @@ const landlordLinks = [
 const tenantLinks = [
   ['/tenant/dashboard', 'Dashboard'],
   ['/tenant/maintenance', 'Maintenance'],
+  ['/account/profile', 'Profile'],
 ];
 
 const operationalLinks = [['/unauthorized', 'Access Pending']];

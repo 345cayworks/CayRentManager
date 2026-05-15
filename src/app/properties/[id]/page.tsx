@@ -8,8 +8,16 @@ import { archivePropertyAction, updatePropertyAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page({ params }: { params: { id: string } }) {
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { edit?: string; updated?: string };
+}) {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const editOpen = searchParams?.edit === '1';
+  const justUpdated = searchParams?.updated === '1';
 
   const property = await prisma.property.findFirst({
     where: { id: params.id, landlordId },
@@ -52,6 +60,11 @@ export default async function Page({ params }: { params: { id: string } }) {
   return (
     <Shell title={`Property: ${property.name}`}>
       <div className="space-y-4">
+        {justUpdated && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            Changes saved.
+          </div>
+        )}
         <section className="rounded-xl bg-white border shadow-sm p-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -72,9 +85,9 @@ export default async function Page({ params }: { params: { id: string } }) {
             </div>
           </div>
 
-          <details className="mt-4 border-t pt-4">
-            <summary className="cursor-pointer text-sm font-medium text-brand-navy">
-              Edit property details
+          <details id="edit" open={editOpen} className="mt-4 border-t pt-4">
+            <summary className="cursor-pointer list-none rounded-lg border border-brand-navy/30 bg-brand-navy/5 px-3 py-2 text-sm font-medium text-brand-navy hover:bg-brand-navy/10">
+              ✏️ Edit property details
             </summary>
             <form action={updatePropertyAction} className="mt-4 grid gap-3 sm:grid-cols-2">
               <input type="hidden" name="propertyId" value={property.id} />
@@ -288,10 +301,20 @@ export default async function Page({ params }: { params: { id: string } }) {
             </div>
 
             <div className="space-y-2">
-              <Link href="/properties" className="text-brand-navy">Back to properties</Link>
+              <Link
+                href={`/properties/${property.id}?edit=1#edit`}
+                className="block rounded bg-brand-navy px-3 py-2 text-center text-sm font-medium text-white hover:bg-brand-navy/90"
+              >
+                ✏️ Edit property
+              </Link>
+              <Link href="/properties" className="block text-sm text-brand-navy">
+                Back to properties
+              </Link>
               <form action={archivePropertyAction} className="mt-2">
                 <input type="hidden" name="propertyId" value={property.id} />
-                <button className="rounded border px-3 py-2 w-full text-left">Archive property</button>
+                <button className="w-full rounded border border-slate-200 px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-50">
+                  Archive property
+                </button>
               </form>
             </div>
           </aside>

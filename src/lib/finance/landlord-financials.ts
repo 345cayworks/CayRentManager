@@ -16,6 +16,28 @@ export interface MonthlyMetrics {
   netCashflow: number;
 }
 
+export type CashflowPoint = {
+  label: string;
+  rentCollected: number;
+  expenses: number;
+  net: number;
+};
+
+export type ComparisonDelta = {
+  current: number;
+  previous: number;
+  deltaPct: number;
+  direction: 'up' | 'down' | 'flat';
+};
+
+export type RentCollectionStatusCounts = {
+  paid: number;
+  pending: number;
+  overdue: number;
+  partial: number;
+  total: number;
+};
+
 /**
  * Get the current month date range (inclusive start, exclusive end)
  */
@@ -24,6 +46,35 @@ export function getCurrentMonthRange(): { start: Date; end: Date } {
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1); // Exclusive end
   return { start, end };
+}
+
+/**
+ * Get the date range for a month offset back from the current month.
+ * monthsBack=0 returns the current month, monthsBack=1 returns the previous month, etc.
+ */
+export function getMonthRange(monthsBack: number): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 1);
+  return { start, end };
+}
+
+/**
+ * Compute a month-over-month delta. Returns the percent change and a direction
+ * flag for UI rendering. When the previous value is zero the percent is set to
+ * 0 (any non-zero current value will still be reported as `up`).
+ */
+export function monthOverMonthDelta(current: number, previous: number): ComparisonDelta {
+  let deltaPct = 0;
+  if (previous !== 0) {
+    deltaPct = Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10;
+  }
+
+  let direction: 'up' | 'down' | 'flat' = 'flat';
+  if (current > previous) direction = 'up';
+  else if (current < previous) direction = 'down';
+
+  return { current, previous, deltaPct, direction };
 }
 
 /**
@@ -180,4 +231,125 @@ export function calculatePropertyCashflow(
     monthlyExpenses,
     netCashflow,
   };
+}
+/**
+ * Build a cashflow series for the last `months` months (most recent last).
+ * Each point sums collected payments (by paymentDate) and active expenses
+ * (by expenseDate) within that calendar month. VOID payments and non-ACTIVE
+ * expenses are excluded.
+ */
+export function getRecentCashflowSeries(
+  payments: Payment[],
+  expenses: Expense[],
+  months = 6
+): CashflowPoint[] {
+  const series: CashflowPoint[] = [];
+
+  for (let i = months - 1; i >= 0; i--) {
+    const { start, end } = getMonthRange(i);
+
+    const rentCollected = payments
+      .filter(
+        (p) =>
+          p.status !== 'VOID' &&
+          p.paymentDate !== null &&
+          p.paymentDate !== undefined &&
+          p.paymentDate >= start &&
+          p.paymentDate < end
+      )
+      .reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0);
+
+    const expensesTotal = expenses
+      .filter(
+        (e) =>
+          e.status === RecordStatus.ACTIVE &&
+          e.expenseDate >= start &&
+          e.expenseDate < end
+      )
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    series.push({
+      label: start.toLocaleDateString('en-US', { month: 'short' }),
+      rentCollected,
+      expenses: expensesTotal,
+      net: rentCollected - expensesTotal,
+    });
+  }
+
+  return series;
+}
+
+/**
+ * Count payments by collection status for a given month. Uses the same buckets
+ * shown on the landlord dashboard: PAID, PARTIAL, OVERDUE, PENDING. Anything
+ * else (e.g. VOID) is excluded.
+ */
+export function getRentCollectionStatusCounts(
+  payments: Pick<Payment, 'status'>[]
+): RentCollectionStatusCounts {
+  const counts = { paid: 0, pending: 0, overdue: 0, partial: 0, total: 0 };
+
+  for (const payment of payments) {
+    switch (payment.status) {
+      case 'PAID':
+        counts.paid += 1;
+        counts.total += 1;
+        break;
+      case 'PENDING':
+        counts.pending += 1;
+        counts.total += 1;
+        break;
+      case 'OVERDUE':
+        counts.overdue += 1;
+        counts.total += 1;
+        break;
+      case 'PARTIAL':
+        counts.partial += 1;
+        counts.total += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return counts;
+}
+
+/**
+ * Reconstruct the overdue balance as of a given cutoff date by walking
+ * payments and accounting for whether each was paid before or after the
+ * cutoff. Only payments with dueDate < cutoff contribute. VOID payments
+ * are ignored. Payments paid in full on or before the cutoff contribute 0;
+ * payments paid after the cutoff contribute their full amountDue at the
+ * cutoff; partials paid before the cutoff contribute their remaining
+ * balance.
+ */
+export function overdueBalanceAsOf(
+  payments: Payment[],
+  cutoff: Date
+): number {
+  let total = 0;
+  for (const payment of payments) {
+    if (payment.status === 'VOID') continue;
+    if (payment.dueDate >= cutoff) continue;
+
+    const paidBeforeCutoff =
+      payment.paymentDate !== null &&
+      payment.paymentDate !== undefined &&
+      payment.paymentDate <= cutoff;
+
+    const amountDue = Number(payment.amountDue);
+    const amountPaid = Number(payment.amountPaid ?? 0);
+
+    if (!paidBeforeCutoff) {
+      // Not yet paid as of cutoff — full amount was overdue.
+      if (amountDue > 0) total += amountDue;
+      continue;
+    }
+
+    // Paid before cutoff: any remaining balance was still overdue.
+    const remaining = amountDue - amountPaid;
+    if (remaining > 0) total += remaining;
+  }
+  return total;
 }

@@ -8,8 +8,16 @@ import { archiveUnitAction, updateUnitAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page({ params }: { params: { id: string } }) {
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { edit?: string; updated?: string };
+}) {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const editOpen = searchParams?.edit === '1';
+  const justUpdated = searchParams?.updated === '1';
 
   const unit = await prisma.unit.findFirst({
     where: { id: params.id, landlordId },
@@ -42,6 +50,11 @@ export default async function Page({ params }: { params: { id: string } }) {
 
   return (
     <Shell title={`Unit: ${unit.unitName}`}>
+      {justUpdated && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Changes saved.
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
           <section className="rounded-xl bg-white border shadow-sm p-4">
@@ -74,9 +87,9 @@ export default async function Page({ params }: { params: { id: string } }) {
               </div>
             </div>
 
-            <details className="mt-4 border-t pt-4">
-              <summary className="cursor-pointer text-sm font-medium text-brand-navy">
-                Edit unit details
+            <details id="edit" open={editOpen} className="mt-4 border-t pt-4">
+              <summary className="cursor-pointer list-none rounded-lg border border-brand-navy/30 bg-brand-navy/5 px-3 py-2 text-sm font-medium text-brand-navy hover:bg-brand-navy/10">
+                ✏️ Edit unit details
               </summary>
               <p className="mt-2 text-xs text-slate-500">
                 Editing rent or deposit does not change amounts on existing leases or invoices —
@@ -227,16 +240,25 @@ export default async function Page({ params }: { params: { id: string } }) {
             <p>${outstandingBalance.toFixed(2)}</p>
           </div>
 
+          <Link
+            href={`/units/${unit.id}?edit=1#edit`}
+            className="block rounded bg-brand-navy px-3 py-2 text-center text-sm font-medium text-white hover:bg-brand-navy/90"
+          >
+            ✏️ Edit unit
+          </Link>
+
           <div className="space-y-2">
-            <Link href="/units" className="text-brand-navy">Back to units</Link>
-            <Link href="/leases" className="text-brand-navy">Create lease</Link>
-            <Link href="/payments" className="text-brand-navy">Record payment</Link>
-            <Link href="/expenses" className="text-brand-navy">Add expense</Link>
+            <Link href="/units" className="block text-sm text-brand-navy">Back to units</Link>
+            <Link href="/leases" className="block text-sm text-brand-navy">Create lease</Link>
+            <Link href="/payments" className="block text-sm text-brand-navy">Record payment</Link>
+            <Link href="/expenses" className="block text-sm text-brand-navy">Add expense</Link>
           </div>
 
           <form action={archiveUnitAction}>
             <input type="hidden" name="unitId" value={unit.id} />
-            <button className="rounded border px-3 py-2 w-full text-left">Archive unit</button>
+            <button className="w-full rounded border border-slate-200 px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-50">
+              Archive unit
+            </button>
           </form>
         </aside>
       </div>

@@ -1,5 +1,40 @@
 # Phase 4 — Lease Tracking & Alerts Completion Notes
 
+Status: **Complete** (closed May 2026 — notification layer landed in sprint 4.5).
+
+Branch: `phase-4-lease-tracking-alerts` (original) + `claude/review-carrentmanager-roadmap-KJD8e` (closure sprint).
+
+## Closure sprint — what shipped
+
+| Roadmap remaining item | Resolution |
+|---|---|
+| Alert badges in navigation | `src/components/shell.tsx` queries the active-alert count for the landlord workspace and renders a red pill on the Alerts link. Renders nothing for tenant / admin / operational roles. Falls back gracefully if the alerts table is unreachable. |
+| Alert preferences | New `AlertPreference` model (per `landlordId`, `userId`): `digestEnabled`, `minSeverity`, `suppressedTypes`. UI at `/account/notifications`. Linked from `/account/profile` and `/alerts`. Server action `updateAlertPreferencesAction` upserts and emits a `notification.preferences_updated` audit log. |
+| Daily digest | Scheduled Netlify function `netlify/functions/alert-digest-daily.ts` runs at 07:00 UTC. For each active landlord workspace it filters alerts per recipient's preferences, queues an outbound notification (plaintext + HTML), then drains the outbox via the configured provider. |
+| Email/SMS notification layer (foundation) | New `OutboundNotification` outbox model with `NotificationStatus` (`PENDING` / `SENT` / `FAILED` / `SKIPPED`) and `NotificationChannel` (`EMAIL` / `SMS`). `src/lib/notifications/outbox.ts` exposes `queueEmailNotification` and `processOutboundNotifications`. Default driver is `log-only`; setting `NOTIFICATION_PROVIDER=resend` + `RESEND_API_KEY` + `NOTIFICATION_FROM_EMAIL` activates Resend via direct `fetch` (no SDK dependency). |
+
+## Deferred (out of scope, captured as future work)
+
+- **Escalation routing** — requires a rules engine and team-member resolution; reasonable as its own phase once concierge/role assignment expands.
+- **Concierge assignment** — depends on the concierge role being wired through the rest of the platform (Phase 5+).
+
+## Schema changes
+
+Forward migration `prisma/migrations/20260515_notification_layer/migration.sql`. Idempotent guards mirror the billing-foundation migration so a partial deploy can be re-run. No backfill required: missing preference rows mean "use defaults" via `resolvePreference()` in `src/lib/notifications/preferences.ts`.
+
+## Operational notes
+
+- Daily digest function is on the cron `0 7 * * *` (07:00 UTC ≈ 02:00 Cayman). Tune via the `schedule` export.
+- Default email driver is `log-only`: deploys without notification credentials remain safe and observable (each "sent" notification logs `[notification:log] id=... to=... subject=...`).
+- To enable live sends, set in Netlify env:
+  - `NOTIFICATION_PROVIDER=resend`
+  - `RESEND_API_KEY=re_...`
+  - `NOTIFICATION_FROM_EMAIL=alerts@yourdomain.com`
+  - `NOTIFICATION_FROM_NAME=CayRentManager` (optional)
+- A failed send marks the row `FAILED` with `failureReason`. Retries are not automatic — a manual rerun of `processOutboundNotifications` will pick up `PENDING` rows; `FAILED` rows are surfaced for triage.
+
+---
+
 Branch: `phase-4-lease-tracking-alerts`
 
 ## Purpose

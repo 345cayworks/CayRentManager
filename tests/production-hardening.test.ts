@@ -151,7 +151,7 @@ describe('production hardening guardrails', () => {
     expect(shell).toContain("'/unauthorized'");
 
     // Tenant navigation must never include landlord-only routes.
-    const tenantLinksMatch = shell.match(/const tenantLinks = \[([\s\S]*?)\];/);
+    const tenantLinksMatch = shell.match(/const tenantLinks[^=]*=\s*\[([\s\S]*?)\];/);
     expect(tenantLinksMatch).not.toBeNull();
     const tenantLinksBlock = tenantLinksMatch![1];
     expect(tenantLinksBlock).not.toContain("'/properties'");
@@ -161,7 +161,7 @@ describe('production hardening guardrails', () => {
     expect(tenantLinksBlock).not.toContain("'/admin'");
 
     // Admin navigation must not bleed into landlord workspace routes.
-    const adminLinksMatch = shell.match(/const adminLinks = \[([\s\S]*?)\];/);
+    const adminLinksMatch = shell.match(/const adminLinks[^=]*=\s*\[([\s\S]*?)\];/);
     expect(adminLinksMatch).not.toBeNull();
     const adminLinksBlock = adminLinksMatch![1];
     expect(adminLinksBlock).not.toContain("'/properties'");

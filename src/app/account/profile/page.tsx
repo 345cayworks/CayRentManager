@@ -137,6 +137,17 @@ export default async function Page({
               )}
             </div>
           </section>
+          <section className="rounded-xl border bg-white p-4 shadow-sm">
+            <h3 className="font-semibold text-slate-950">Notifications</h3>
+            <div className="mt-3 space-y-2">
+              <Link href="/account/notifications" className="block text-sm text-brand-navy">
+                Alert digest preferences
+              </Link>
+              <p className="text-xs text-slate-500">
+                Choose which alerts you want delivered by email.
+              </p>
+            </div>
+          </section>
         </aside>
       </div>
     </Shell>

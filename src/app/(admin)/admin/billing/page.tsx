@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { RecordStatus } from '@prisma/client';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { isBillingTableMissingError } from '@/lib/billing/safe-query';
@@ -27,6 +29,7 @@ export default async function AdminBillingPage() {
   await requireSuperadmin();
 
   let subs: any[] = [];
+  let activePlans: { id: string; code: string; name: string; amount: number; currency: string; intervalMonths: number }[] = [];
 
   try {
     subs = await prisma.landlordSubscription.findMany({
@@ -40,6 +43,19 @@ export default async function AdminBillingPage() {
       },
       orderBy: { updatedAt: 'desc' },
     });
+
+    const plans = await prisma.subscriptionPlan.findMany({
+      where: { status: RecordStatus.ACTIVE },
+      orderBy: { amount: 'asc' },
+    });
+    activePlans = plans.map((plan) => ({
+      id: plan.id,
+      code: plan.code,
+      name: plan.name,
+      amount: Number(plan.amount),
+      currency: plan.currency,
+      intervalMonths: plan.intervalMonths,
+    }));
   } catch (error) {
     if (!isBillingTableMissingError(error)) throw error;
   }
@@ -63,6 +79,7 @@ export default async function AdminBillingPage() {
 
     return {
       subscriptionId: s.id,
+      planId: s.planId,
       landlordName: s.landlord.displayName,
       planName: s.plan.name,
       amountLabel: complimentary
@@ -91,8 +108,17 @@ export default async function AdminBillingPage() {
 
   return (
     <Shell title="Billing Management">
+      <div className="mb-3 flex items-center justify-end">
+        <Link
+          href="/admin/billing/plans"
+          className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Manage Plans
+        </Link>
+      </div>
       <BillingManagementClient
         rows={rows}
+        plans={activePlans}
         activeSubscribers={activeSubscribers}
         complimentaryCount={complimentaryCount}
         monthlyRevenue={monthlyRevenue}

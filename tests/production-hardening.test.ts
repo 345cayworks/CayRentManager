@@ -47,6 +47,66 @@ describe('production hardening guardrails', () => {
     expect(unsafeScopedUpdates).toEqual([]);
   });
 
+  it('keeps the landlord edit actions workspace-scoped and audited', () => {
+    const actions = read('src/server/actions.ts');
+
+    for (const fn of ['updatePropertyAction', 'updateUnitAction', 'updateTenantAction']) {
+      expect(actions).toContain(`export async function ${fn}`);
+    }
+
+    // Each edit action must reach updateMany (workspace-scoped) and
+    // assertSingleWorkspaceUpdate must gate the result.
+    expect(actions).toContain('prisma.property.updateMany');
+    expect(actions).toContain('prisma.unit.updateMany');
+    expect(actions).toContain('prisma.tenant.updateMany');
+
+    for (const event of ['property.updated', 'unit.updated', 'tenant.updated', 'user.profile_updated']) {
+      expect(actions).toContain(event);
+    }
+  });
+
+  it('does not expose tenant email or user identity fields through edit actions', () => {
+    const actions = read('src/server/actions.ts');
+
+    // Scope the assertion to the update payload only — audit calls
+    // legitimately reference user.email as the actor identity.
+    const tenantPayloadMatch = actions.match(
+      /export async function updateTenantAction[\s\S]*?const data = \{([\s\S]*?)\};/
+    );
+    expect(tenantPayloadMatch).not.toBeNull();
+    const tenantPayload = tenantPayloadMatch![1];
+    expect(tenantPayload).not.toMatch(/\bemail\b/);
+    expect(tenantPayload).not.toMatch(/\bstatus\b/);
+    expect(tenantPayload).not.toMatch(/\blandlordId\b/);
+    expect(tenantPayload).not.toMatch(/\buserId\b/);
+
+    const profilePayloadMatch = actions.match(
+      /export async function updateUserProfileAction[\s\S]*?const data = \{([\s\S]*?)\};/
+    );
+    expect(profilePayloadMatch).not.toBeNull();
+    const profilePayload = profilePayloadMatch![1];
+    expect(profilePayload).not.toMatch(/\brole\b/);
+    expect(profilePayload).not.toMatch(/\bstatus\b/);
+    expect(profilePayload).not.toMatch(/\bemail\b/);
+    expect(profilePayload).not.toMatch(/\bmustChangePassword\b/);
+
+    const unitPayloadMatch = actions.match(
+      /export async function updateUnitAction[\s\S]*?const data = \{([\s\S]*?)\};/
+    );
+    expect(unitPayloadMatch).not.toBeNull();
+    const unitPayload = unitPayloadMatch![1];
+    expect(unitPayload).not.toMatch(/\bpropertyId\b/);
+    expect(unitPayload).not.toMatch(/\blandlordId\b/);
+
+    const propertyPayloadMatch = actions.match(
+      /export async function updatePropertyAction[\s\S]*?const data = \{([\s\S]*?)\};/
+    );
+    expect(propertyPayloadMatch).not.toBeNull();
+    const propertyPayload = propertyPayloadMatch![1];
+    expect(propertyPayload).not.toMatch(/\blandlordId\b/);
+    expect(propertyPayload).not.toMatch(/\bstatus\b/);
+  });
+
   it('keeps invite acceptance and public landlord registration transactional and idempotent', () => {
     const invitations = read('src/lib/services/invitations.ts');
     const registration = read('src/lib/services/registration.ts');
@@ -73,16 +133,40 @@ describe('production hardening guardrails', () => {
     }
   });
 
-  it('keeps shell navigation role-aware and hides unfinished workflow links', () => {
+  it('keeps shell navigation role-aware and isolates operational roles', () => {
     const shell = read('src/components/shell.tsx');
 
+    // Navigation must dispatch by role, not be a flat link list.
     expect(shell).toContain('linksForRole');
     expect(shell).toContain('UserRole.SUPERADMIN');
     expect(shell).toContain('UserRole.TENANT');
-    expect(shell).not.toContain("'/maintenance'");
-    expect(shell).not.toContain("'/documents'");
-    expect(shell).not.toContain("'/reports'");
-    expect(shell).not.toContain("'/settings'");
+    expect(shell).toContain('UserRole.LANDLORD');
+
+    // Operational roles (vendor, maintenance provider, concierge, guest) must
+    // route to /unauthorized rather than receive landlord or admin navigation.
+    expect(shell).toContain('UserRole.VENDOR');
+    expect(shell).toContain('UserRole.MAINTENANCE_PROVIDER');
+    expect(shell).toContain('UserRole.CONCIERGE_AGENT');
+    expect(shell).toContain('UserRole.GUEST');
+    expect(shell).toContain("'/unauthorized'");
+
+    // Tenant navigation must never include landlord-only routes.
+    const tenantLinksMatch = shell.match(/const tenantLinks = \[([\s\S]*?)\];/);
+    expect(tenantLinksMatch).not.toBeNull();
+    const tenantLinksBlock = tenantLinksMatch![1];
+    expect(tenantLinksBlock).not.toContain("'/properties'");
+    expect(tenantLinksBlock).not.toContain("'/payments'");
+    expect(tenantLinksBlock).not.toContain("'/expenses'");
+    expect(tenantLinksBlock).not.toContain("'/reports'");
+    expect(tenantLinksBlock).not.toContain("'/admin'");
+
+    // Admin navigation must not bleed into landlord workspace routes.
+    const adminLinksMatch = shell.match(/const adminLinks = \[([\s\S]*?)\];/);
+    expect(adminLinksMatch).not.toBeNull();
+    const adminLinksBlock = adminLinksMatch![1];
+    expect(adminLinksBlock).not.toContain("'/properties'");
+    expect(adminLinksBlock).not.toContain("'/dashboard'");
+    expect(adminLinksBlock).not.toContain("'/tenant/");
   });
 
   it('guards dangerous admin role transitions', () => {

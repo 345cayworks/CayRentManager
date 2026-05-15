@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as healthGet } from '@/app/api/health/route';
 import { GET as meGet } from '@/app/api/identity/me/route';
 import { POST as bootstrapPost } from '@/app/api/admin/bootstrap-owner/route';
@@ -84,6 +84,13 @@ describe('protected owner bootstrap endpoint', () => {
     vi.clearAllMocks();
     delete process.env.SUPER_ADMIN_EMAIL;
     delete process.env.SUPERADMIN_MASTER_KEY;
+    // Final Phase 1 bootstrap policy: the route is opt-in via an explicit env
+    // gate. These tests cover the in-policy behavior with the route enabled.
+    process.env.ENABLE_BOOTSTRAP_OWNER_ROUTE = 'true';
+  });
+
+  afterEach(() => {
+    delete process.env.ENABLE_BOOTSTRAP_OWNER_ROUTE;
   });
 
   function request(masterKey: string) {
@@ -92,6 +99,18 @@ describe('protected owner bootstrap endpoint', () => {
       body: JSON.stringify({ masterKey }),
     });
   }
+
+  it('returns 404 when the env gate is not enabled (route off by default)', async () => {
+    delete process.env.ENABLE_BOOTSTRAP_OWNER_ROUTE;
+    process.env.SUPER_ADMIN_EMAIL = 'Owner@Example.com';
+    process.env.SUPERADMIN_MASTER_KEY = 'correct-key';
+
+    const response = await bootstrapPost(request('correct-key'));
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ ok: false });
+    expect(mockedPrisma.user.upsert).not.toHaveBeenCalled();
+  });
 
   it('does not run when bootstrap environment is missing', async () => {
     const response = await bootstrapPost(request('anything'));

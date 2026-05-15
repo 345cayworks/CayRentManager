@@ -4,7 +4,7 @@ import { LeaseStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { deactivateTenantAction } from '@/server/actions';
+import { deactivateTenantAction, updateTenantAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +57,78 @@ export default async function Page({ params }: { params: { id: string } }) {
                 <p className="text-slate-500">Status</p>
                 <p>{tenant.status}</p>
               </div>
+              <div>
+                <p className="text-slate-500">Emergency contact</p>
+                <p>
+                  {tenant.emergencyContactName ?? '—'}
+                  {tenant.emergencyContactPhone ? ` · ${tenant.emergencyContactPhone}` : ''}
+                </p>
+              </div>
             </div>
+
+            <details className="mt-4 border-t pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-brand-navy">
+                Edit tenant details
+              </summary>
+              <p className="mt-2 text-xs text-slate-500">
+                Email is tied to this tenant&apos;s login and cannot be changed here. To change the
+                login email, re-invite the tenant with the new email.
+              </p>
+              <form action={updateTenantAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+                <input type="hidden" name="tenantId" value={tenant.id} />
+                <label className="text-sm sm:col-span-2">
+                  <span className="text-slate-500">Full name</span>
+                  <input
+                    name="fullName"
+                    required
+                    defaultValue={tenant.fullName}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Phone</span>
+                  <input
+                    name="phone"
+                    type="tel"
+                    defaultValue={tenant.phone ?? ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Employer</span>
+                  <input
+                    name="employer"
+                    defaultValue={tenant.employer ?? ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Emergency contact name</span>
+                  <input
+                    name="emergencyContactName"
+                    defaultValue={tenant.emergencyContactName ?? ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Emergency contact phone</span>
+                  <input
+                    name="emergencyContactPhone"
+                    type="tel"
+                    defaultValue={tenant.emergencyContactPhone ?? ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="rounded bg-brand-navy px-4 py-2 text-sm font-medium text-white"
+                  >
+                    Save changes
+                  </button>
+                </div>
+              </form>
+            </details>
           </section>
 
           <section className="rounded-xl bg-white border shadow-sm p-4">

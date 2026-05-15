@@ -4,7 +4,7 @@ import { PaymentStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { archivePropertyAction } from '@/server/actions';
+import { archivePropertyAction, updatePropertyAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +71,97 @@ export default async function Page({ params }: { params: { id: string } }) {
               <p>{property.status}</p>
             </div>
           </div>
+
+          <details className="mt-4 border-t pt-4">
+            <summary className="cursor-pointer text-sm font-medium text-brand-navy">
+              Edit property details
+            </summary>
+            <form action={updatePropertyAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+              <input type="hidden" name="propertyId" value={property.id} />
+              <label className="text-sm">
+                <span className="text-slate-500">Name</span>
+                <input
+                  name="name"
+                  required
+                  defaultValue={property.name}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="text-slate-500">Property type</span>
+                <input
+                  name="propertyType"
+                  defaultValue={property.propertyType}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <label className="text-sm sm:col-span-2">
+                <span className="text-slate-500">Address</span>
+                <input
+                  name="address"
+                  required
+                  defaultValue={property.address}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="text-slate-500">City</span>
+                <input
+                  name="city"
+                  required
+                  defaultValue={property.city}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="text-slate-500">State / Parish</span>
+                <input
+                  name="state"
+                  required
+                  defaultValue={property.state}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="text-slate-500">Country</span>
+                <input
+                  name="country"
+                  defaultValue={property.country}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="text-slate-500">Purchase price (optional)</span>
+                <input
+                  name="purchasePrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={property.purchasePrice?.toString() ?? ''}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="text-slate-500">Estimated value (optional)</span>
+                <input
+                  name="estimatedValue"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={property.estimatedValue?.toString() ?? ''}
+                  className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                />
+              </label>
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  className="rounded bg-brand-navy px-4 py-2 text-sm font-medium text-white"
+                >
+                  Save changes
+                </button>
+              </div>
+            </form>
+          </details>
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">

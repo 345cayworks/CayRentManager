@@ -303,6 +303,11 @@ export async function convertToPaidAction(formData: FormData) {
   const actor = await requireSuperadmin();
   const subscriptionId = text(formData, 'subscriptionId');
   const subscription = await getSubscriptionOrThrow(subscriptionId);
+
+  if (!subscription.plan) {
+    throw new Error('Subscription has no assigned plan; cannot convert to paid.');
+  }
+
   const now = new Date();
 
   await prisma.landlordSubscription.update({

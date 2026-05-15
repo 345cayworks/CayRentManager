@@ -4,7 +4,7 @@ import { LeaseStatus, PaymentStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { archiveUnitAction } from '@/server/actions';
+import { archiveUnitAction, updateUnitAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +73,92 @@ export default async function Page({ params }: { params: { id: string } }) {
                 <p>{unit.bathrooms?.toString() ?? '—'}</p>
               </div>
             </div>
+
+            <details className="mt-4 border-t pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-brand-navy">
+                Edit unit details
+              </summary>
+              <p className="mt-2 text-xs text-slate-500">
+                Editing rent or deposit does not change amounts on existing leases or invoices —
+                those are snapshotted at creation. New leases will use the updated values.
+              </p>
+              <form action={updateUnitAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+                <input type="hidden" name="unitId" value={unit.id} />
+                <label className="text-sm">
+                  <span className="text-slate-500">Unit name</span>
+                  <input
+                    name="unitName"
+                    required
+                    defaultValue={unit.unitName}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Rent amount</span>
+                  <input
+                    name="rentAmount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    defaultValue={Number(unit.rentAmount).toString()}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Deposit amount (optional)</span>
+                  <input
+                    name="depositAmount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={unit.depositAmount ? Number(unit.depositAmount).toString() : ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Bedrooms</span>
+                  <input
+                    name="bedrooms"
+                    type="number"
+                    step="1"
+                    min="0"
+                    defaultValue={unit.bedrooms?.toString() ?? ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Bathrooms</span>
+                  <input
+                    name="bathrooms"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    defaultValue={unit.bathrooms ? Number(unit.bathrooms).toString() : ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Square feet</span>
+                  <input
+                    name="squareFeet"
+                    type="number"
+                    step="1"
+                    min="0"
+                    defaultValue={unit.squareFeet?.toString() ?? ''}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  />
+                </label>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="rounded bg-brand-navy px-4 py-2 text-sm font-medium text-white"
+                  >
+                    Save changes
+                  </button>
+                </div>
+              </form>
+            </details>
           </section>
 
           <section className="rounded-xl bg-white border shadow-sm p-4">

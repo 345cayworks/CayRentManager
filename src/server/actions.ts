@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { LeaseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PaymentMethodType, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
-import { getCurrentLandlordWorkspace, requireRole, requireSuperadmin } from '@/lib/auth/guards';
+import { getCurrentLandlordWorkspace, requireAuthAllowPasswordChange, requireRole, requireSuperadmin } from '@/lib/auth/guards';
 import { requireOwnedLease, requireOwnedProperty, requireOwnedTenant, requireOwnedUnit } from '@/lib/auth/ownership';
 import { createInvoiceForLease, applyPaymentToInvoice, generateReceiptForPayment } from '@/lib/payments/invoices';
 import { registerPublicLandlord } from '@/lib/services/registration';
@@ -790,4 +790,132 @@ export async function archiveMaintenanceAction(formData: FormData) {
 
 export async function ensureSuperadminAction() {
   await requireSuperadmin();
+}
+
+function optionalText(formData: FormData, key: string) {
+  const value = text(formData, key);
+  return value.length > 0 ? value : null;
+}
+
+function optionalDecimalString(formData: FormData, key: string, label: string) {
+  const value = text(formData, key);
+  if (value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${label} must be a non-negative number.`);
+  }
+  return value;
+}
+
+function optionalIntegerString(formData: FormData, key: string, label: string) {
+  const value = text(formData, key);
+  if (value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${label} must be a non-negative whole number.`);
+  }
+  return parsed;
+}
+
+export async function updatePropertyAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const propertyId = requiredText(formData, 'propertyId');
+
+  const data = {
+    name: requiredText(formData, 'name'),
+    address: requiredText(formData, 'address'),
+    city: requiredText(formData, 'city'),
+    state: requiredText(formData, 'state'),
+    country: text(formData, 'country') || 'US',
+    propertyType: text(formData, 'propertyType') || 'Residential',
+    purchasePrice: optionalDecimalString(formData, 'purchasePrice', 'Purchase price'),
+    estimatedValue: optionalDecimalString(formData, 'estimatedValue', 'Estimated value'),
+  };
+
+  const result = await prisma.property.updateMany({
+    where: { id: propertyId, landlordId },
+    data,
+  });
+  assertSingleWorkspaceUpdate(result);
+
+  await audit(user.userId, user.email, 'property.updated', 'Property', propertyId, landlordId, {
+    fields: Object.keys(data),
+  });
+  revalidatePath(`/properties/${propertyId}`);
+  revalidatePath('/properties');
+  revalidatePath('/dashboard');
+}
+
+export async function updateUnitAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const unitId = requiredText(formData, 'unitId');
+
+  const data = {
+    unitName: requiredText(formData, 'unitName'),
+    bedrooms: optionalIntegerString(formData, 'bedrooms', 'Bedrooms'),
+    bathrooms: optionalDecimalString(formData, 'bathrooms', 'Bathrooms'),
+    squareFeet: optionalIntegerString(formData, 'squareFeet', 'Square feet'),
+    rentAmount: positiveNumber(money(formData, 'rentAmount'), 'Rent amount'),
+    depositAmount: optionalDecimalString(formData, 'depositAmount', 'Deposit amount'),
+  };
+
+  const result = await prisma.unit.updateMany({
+    where: { id: unitId, landlordId },
+    data,
+  });
+  assertSingleWorkspaceUpdate(result);
+
+  await audit(user.userId, user.email, 'unit.updated', 'Unit', unitId, landlordId, {
+    fields: Object.keys(data),
+  });
+  revalidatePath(`/units/${unitId}`);
+  revalidatePath('/units');
+  revalidatePath('/dashboard');
+}
+
+export async function updateTenantAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const tenantId = requiredText(formData, 'tenantId');
+
+  const data = {
+    fullName: requiredText(formData, 'fullName'),
+    phone: optionalText(formData, 'phone'),
+    employer: optionalText(formData, 'employer'),
+    emergencyContactName: optionalText(formData, 'emergencyContactName'),
+    emergencyContactPhone: optionalText(formData, 'emergencyContactPhone'),
+  };
+
+  const result = await prisma.tenant.updateMany({
+    where: { id: tenantId, landlordId },
+    data,
+  });
+  assertSingleWorkspaceUpdate(result);
+
+  await audit(user.userId, user.email, 'tenant.updated', 'Tenant', tenantId, landlordId, {
+    fields: Object.keys(data),
+  });
+  revalidatePath(`/tenants/${tenantId}`);
+  revalidatePath('/tenants');
+  revalidatePath('/dashboard');
+}
+
+export async function updateUserProfileAction(formData: FormData) {
+  const user = await requireAuthAllowPasswordChange();
+
+  const data = {
+    name: optionalText(formData, 'name'),
+    fullName: optionalText(formData, 'fullName'),
+    phone: optionalText(formData, 'phone'),
+  };
+
+  const result = await prisma.user.updateMany({
+    where: { id: user.userId },
+    data,
+  });
+  if (result.count !== 1) throw new Error('Profile not found for this user.');
+
+  await audit(user.userId, user.email, 'user.profile_updated', 'User', user.userId, undefined, {
+    fields: Object.keys(data),
+  });
+  revalidatePath('/account/profile');
 }

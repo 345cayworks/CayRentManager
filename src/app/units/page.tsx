@@ -30,18 +30,26 @@ export default async function Page() {
       <div className="rounded-xl bg-white border shadow-sm divide-y">
         {units.length === 0 ? <p className="p-4 text-slate-600">No units yet.</p> : null}
         {units.map((unit) => (
-          <div key={unit.id} className="p-4 flex justify-between">
+          <div key={unit.id} className="p-4 flex justify-between gap-4">
             <div>
               <Link href={`/units/${unit.id}`} className="font-medium text-brand-navy">
                 {unit.unitName}
               </Link>
               <p className="text-sm text-slate-600">{unit.property.name}</p>
             </div>
-            <div className="text-right space-y-2">
+            <div className="flex items-center gap-3">
               <p className="font-medium">${Number(unit.rentAmount).toFixed(2)}</p>
+              <Link
+                href={`/units/${unit.id}?edit=1#edit`}
+                className="text-sm rounded border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:bg-slate-50"
+              >
+                Edit
+              </Link>
               <form action={archiveUnitAction}>
                 <input type="hidden" name="unitId" value={unit.id} />
-                <button className="text-sm rounded border px-3 py-1">Archive</button>
+                <button className="text-sm rounded border border-slate-200 px-3 py-1 text-slate-500 hover:bg-slate-50">
+                  Archive
+                </button>
               </form>
             </div>
           </div>

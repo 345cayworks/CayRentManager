@@ -55,10 +55,20 @@ export default async function Page() {
                 </Link>
                 <p className="text-sm text-slate-600">{tenant.email}</p>
               </div>
-              <form action={deactivateTenantAction}>
-                <input type="hidden" name="tenantId" value={tenant.id} />
-                <button className="text-sm rounded border px-3 py-1">Deactivate</button>
-              </form>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/tenants/${tenant.id}?edit=1#edit`}
+                  className="text-sm rounded border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:bg-slate-50"
+                >
+                  Edit
+                </Link>
+                <form action={deactivateTenantAction}>
+                  <input type="hidden" name="tenantId" value={tenant.id} />
+                  <button className="text-sm rounded border border-slate-200 px-3 py-1 text-slate-500 hover:bg-slate-50">
+                    Deactivate
+                  </button>
+                </form>
+              </div>
             </div>
           ))}
         </section>

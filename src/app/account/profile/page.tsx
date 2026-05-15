@@ -6,8 +6,13 @@ import { updateUserProfileAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: { updated?: string };
+}) {
   const auth = await requireAuthAllowPasswordChange();
+  const justUpdated = searchParams?.updated === '1';
 
   const user = await prisma.user.findUnique({
     where: { id: auth.userId },
@@ -37,6 +42,11 @@ export default async function Page() {
 
   return (
     <Shell title="Profile">
+      {justUpdated && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Profile saved.
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
           <section className="rounded-xl border bg-white p-4 shadow-sm">

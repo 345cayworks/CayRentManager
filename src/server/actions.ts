@@ -844,6 +844,7 @@ export async function updatePropertyAction(formData: FormData) {
   revalidatePath(`/properties/${propertyId}`);
   revalidatePath('/properties');
   revalidatePath('/dashboard');
+  redirect(`/properties/${propertyId}?updated=1`);
 }
 
 export async function updateUnitAction(formData: FormData) {
@@ -871,6 +872,7 @@ export async function updateUnitAction(formData: FormData) {
   revalidatePath(`/units/${unitId}`);
   revalidatePath('/units');
   revalidatePath('/dashboard');
+  redirect(`/units/${unitId}?updated=1`);
 }
 
 export async function updateTenantAction(formData: FormData) {
@@ -897,6 +899,7 @@ export async function updateTenantAction(formData: FormData) {
   revalidatePath(`/tenants/${tenantId}`);
   revalidatePath('/tenants');
   revalidatePath('/dashboard');
+  redirect(`/tenants/${tenantId}?updated=1`);
 }
 
 export async function updateUserProfileAction(formData: FormData) {
@@ -918,4 +921,5 @@ export async function updateUserProfileAction(formData: FormData) {
     fields: Object.keys(data),
   });
   revalidatePath('/account/profile');
+  redirect('/account/profile?updated=1');
 }

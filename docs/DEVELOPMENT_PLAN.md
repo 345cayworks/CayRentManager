@@ -91,6 +91,7 @@ The platform now has meaningful operational depth, but final production confiden
 
 Latest confirmed merged work includes:
 
+- Phase 3 sprint closeout (vendor management, dispatch workflow, SLA tracking, vendor portal)
 - Phase 4 alert center and alert automation foundation
 - document vault foundation
 - registration workflow tightening
@@ -168,7 +169,7 @@ Deferred to later phases:
 Status:
 
 ```text
-Implemented foundation
+Complete
 ```
 
 Implemented:
@@ -181,6 +182,10 @@ Implemented:
 - landlord maintenance vendor model
 - maintenance vendor assignment concept
 - vendor/work-order relations
+- richer vendor UI (edit, archive, restore, contact + licence + insurance)
+- vendor portal login (`/vendor/dashboard`, `/vendor/work-orders/[id]`)
+- work-order dispatch workflow with `WorkOrderStatus` enum and guarded transitions
+- maintenance SLA tracking (per-priority targets, due-by, breach badges)
 
 Current vendor model:
 
@@ -190,14 +195,10 @@ MaintenanceVendor is landlord-scoped through landlordId
 
 This means each landlord can maintain their own private vendor list.
 
-Remaining:
+Deferred to later phases:
 
-- richer vendor UI
-- vendor portal login
-- work-order dispatch workflow
-- maintenance SLA tracking
-- before/after photo uploads
-- vendor marketplace/global vendor layer
+- before/after photo uploads (Phase 7, blocked on `@netlify/blobs`)
+- vendor marketplace/global vendor layer (Phase 5.1)
 
 ---
 
@@ -326,36 +327,33 @@ At least one number
 Status:
 
 ```text
-Foundation implemented
+Complete
 ```
 
 Implemented:
 
-- new landlord onboarding route
+- new landlord onboarding route with progress hero, dismiss, restore, and mark-complete actions
 - first-login onboarding redirect when a workspace is created
-- onboarding progress cards
-- setup milestones
-- property/unit/tenant/maintenance starter flow
-- setup progress count
+- dedicated `/onboarding/company-profile` wizard that captures contact, address, branding, and operational defaults
+- dedicated `/properties/new`, `/units/new`, and `/tenants/new` guided wizards with save-and-continue flow
+- onboarding completion persistence (`onboardingCompletedAt` / `onboardingCompletedBy`)
+- skip/dismiss onboarding preference (`onboardingDismissedAt` / `onboardingDismissedBy`)
+- dashboard onboarding nudge card and sidebar `Onboarding` badge with remaining count
 
 Current onboarding milestones:
 
 ```text
+Complete company profile
 Add first property
 Create units
 Invite tenants
 Activate maintenance tracking
 ```
 
-Remaining:
+Future enhancements (out of scope for Phase 2 closeout):
 
-- company profile setup wizard
-- `/properties/new` dedicated first-property wizard
-- `/units/new` dedicated guided unit flow
-- `/tenants/new` invite-first-tenant flow
-- onboarding completion persistence
-- skip/dismiss onboarding preference
-- onboarding checklist badges in dashboard
+- onboarding analytics and per-milestone funnel reporting
+- logo file uploads (currently logo is a URL field)
 
 ---
 

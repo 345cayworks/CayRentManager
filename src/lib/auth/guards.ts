@@ -134,6 +134,16 @@ export async function requireTenantAccess(tenantId: string) {
   return user;
 }
 
+export async function requireVendorUser() {
+  const user = await requireRole([UserRole.VENDOR, UserRole.MAINTENANCE_PROVIDER]);
+  const vendor = await prisma.maintenanceVendor.findFirst({
+    where: { userId: user.userId, archivedAt: null },
+    include: { landlord: true },
+  });
+  if (!vendor) redirect('/unauthorized');
+  return { user, vendor };
+}
+
 export async function getCurrentLandlordWorkspace() {
   const user = await requireRole([
     UserRole.LANDLORD,

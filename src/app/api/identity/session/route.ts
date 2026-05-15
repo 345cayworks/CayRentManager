@@ -39,6 +39,11 @@ function getRedirectPath(role: UserRole | string, status: UserStatus | string, m
     case 'PROPERTY_MANAGER':
     case 'ACCOUNTANT':
       return createdWorkspace ? '/onboarding' : '/dashboard';
+    case UserRole.VENDOR:
+    case UserRole.MAINTENANCE_PROVIDER:
+    case 'VENDOR':
+    case 'MAINTENANCE_PROVIDER':
+      return '/vendor/dashboard';
     default:
       return '/unauthorized';
   }

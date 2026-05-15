@@ -1,10 +1,19 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MaintenanceStatus } from '@prisma/client';
+import { MaintenanceStatus, WorkOrderStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { addMaintenanceAttachmentAction, addMaintenanceCommentAction, assignMaintenanceVendorAction, createMaintenanceWorkOrderAction, updateMaintenanceStatusAction } from '@/server/actions';
+import {
+  addMaintenanceAttachmentAction,
+  addMaintenanceCommentAction,
+  assignMaintenanceVendorAction,
+  createMaintenanceWorkOrderAction,
+  dispatchWorkOrderAction,
+  updateMaintenanceStatusAction,
+  updateWorkOrderStatusAction,
+} from '@/server/actions';
+import { formatSlaCountdown, getSlaStatus, type SlaStatus } from '@/lib/maintenance/sla';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +21,28 @@ const statuses: MaintenanceStatus[] = [MaintenanceStatus.OPEN, MaintenanceStatus
 
 function badge(value: string) {
   return <span className="inline-flex rounded-full border bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">{value.replaceAll('_', ' ')}</span>;
+}
+
+function slaBadge(status: SlaStatus, label: string) {
+  const tones: Record<SlaStatus, string> = {
+    ON_TRACK: 'bg-emerald-100 text-emerald-700',
+    AT_RISK: 'bg-amber-100 text-amber-700',
+    BREACHED: 'bg-red-100 text-red-700',
+    MET: 'bg-slate-100 text-slate-600',
+  };
+  return (
+    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${tones[status]}`}>
+      {label}
+    </span>
+  );
+}
+
+function renderSlaBadge(slaDueAt: Date | null, resolvedAt: Date | null) {
+  const status = getSlaStatus({ slaDueAt, resolvedAt });
+  if (status === 'MET') return slaBadge(status, 'SLA met');
+  if (status === 'BREACHED') return slaBadge(status, slaDueAt ? `SLA ${formatSlaCountdown(slaDueAt)}` : 'SLA breached');
+  if (status === 'AT_RISK') return slaBadge(status, slaDueAt ? `At risk · ${formatSlaCountdown(slaDueAt)}` : 'At risk');
+  return slaBadge(status, slaDueAt ? `On track · ${formatSlaCountdown(slaDueAt)}` : 'On track');
 }
 
 function formatMoney(value: unknown) {
@@ -35,7 +66,7 @@ export default async function Page({ params }: { params: { maintenanceId: string
         workOrders: { include: { vendor: true }, orderBy: { createdAt: 'desc' } },
       },
     }),
-    prisma.maintenanceVendor.findMany({ where: { landlordId }, orderBy: { name: 'asc' } }),
+    prisma.maintenanceVendor.findMany({ where: { landlordId, archivedAt: null }, orderBy: { name: 'asc' } }),
   ]);
 
   if (!request) notFound();
@@ -58,6 +89,7 @@ export default async function Page({ params }: { params: { maintenanceId: string
                 {badge(request.status)}
                 {badge(request.category)}
                 {badge(request.priority)}
+                {renderSlaBadge(request.slaDueAt, request.resolvedAt)}
               </div>
             </div>
             <p className="mt-5 whitespace-pre-line text-slate-700">{request.description}</p>
@@ -66,6 +98,15 @@ export default async function Page({ params }: { params: { maintenanceId: string
               <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Preferred contact:</span> {request.preferredContactTime ?? 'Not provided'}</div>
               <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Vendor:</span> {request.vendor?.name ?? 'Not assigned'}</div>
               <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Created:</span> {request.createdAt.toLocaleDateString()}</div>
+              {request.slaDueAt ? (
+                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">SLA due:</span> {request.slaDueAt.toLocaleString()}</div>
+              ) : null}
+              {request.firstResponseAt ? (
+                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">First response:</span> {request.firstResponseAt.toLocaleString()}</div>
+              ) : null}
+              {request.resolvedAt ? (
+                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Resolved:</span> {request.resolvedAt.toLocaleString()}</div>
+              ) : null}
             </div>
           </article>
 
@@ -115,11 +156,61 @@ export default async function Page({ params }: { params: { maintenanceId: string
             <div className="mt-4 space-y-3">
               {request.workOrders.length === 0 ? <p className="text-sm text-slate-500">No work orders yet.</p> : null}
               {request.workOrders.map((order) => (
-                <div key={order.id} className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-700">
+                <div key={order.id} className="rounded-xl border bg-slate-50 p-4 text-sm text-slate-700 space-y-3">
                   <div className="flex flex-wrap gap-2">{badge(order.status)}{order.vendor ? badge(order.vendor.name) : null}</div>
-                  <p className="mt-2">Estimated cost: {formatMoney(order.estimatedCost)}</p>
-                  <p>Scheduled: {order.scheduledDate ? order.scheduledDate.toLocaleDateString() : 'Not scheduled'}</p>
-                  {order.notes ? <p className="mt-2 whitespace-pre-line">{order.notes}</p> : null}
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <p>Estimated cost: {formatMoney(order.estimatedCost)}</p>
+                    <p>Actual cost: {formatMoney(order.actualCost)}</p>
+                    <p>Scheduled: {order.scheduledDate ? order.scheduledDate.toLocaleDateString() : 'Not scheduled'}</p>
+                    <p>Dispatched: {order.dispatchedAt ? order.dispatchedAt.toLocaleString() : '—'}</p>
+                    <p>Started: {order.startedAt ? order.startedAt.toLocaleString() : '—'}</p>
+                    <p>Completed: {order.completedAt ? order.completedAt.toLocaleString() : '—'}</p>
+                    {order.vendorAcknowledgedAt ? (
+                      <p>Vendor acknowledged: {order.vendorAcknowledgedAt.toLocaleString()}</p>
+                    ) : null}
+                    {order.cancelledAt ? (
+                      <p>Cancelled: {order.cancelledAt.toLocaleString()}{order.cancelReason ? ` · ${order.cancelReason}` : ''}</p>
+                    ) : null}
+                  </div>
+                  {order.notes ? <p className="whitespace-pre-line">{order.notes}</p> : null}
+                  {order.completionNotes ? (
+                    <p className="whitespace-pre-line"><span className="font-medium">Completion notes:</span> {order.completionNotes}</p>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-3">
+                    {order.status === WorkOrderStatus.OPEN && order.vendorId ? (
+                      <form action={dispatchWorkOrderAction}>
+                        <input type="hidden" name="workOrderId" value={order.id} />
+                        <button className="rounded bg-brand-navy px-3 py-1 text-xs text-white">Dispatch</button>
+                      </form>
+                    ) : null}
+                    {(order.status === WorkOrderStatus.OPEN || order.status === WorkOrderStatus.DISPATCHED) ? (
+                      <form action={updateWorkOrderStatusAction}>
+                        <input type="hidden" name="workOrderId" value={order.id} />
+                        <input type="hidden" name="status" value={WorkOrderStatus.IN_PROGRESS} />
+                        <button className="rounded border px-3 py-1 text-xs">Mark in progress</button>
+                      </form>
+                    ) : null}
+                    {order.status === WorkOrderStatus.IN_PROGRESS ? (
+                      <form action={updateWorkOrderStatusAction} className="flex flex-wrap gap-2 items-center">
+                        <input type="hidden" name="workOrderId" value={order.id} />
+                        <input type="hidden" name="status" value={WorkOrderStatus.COMPLETED} />
+                        <input name="actualCost" type="number" step="0.01" placeholder="Actual cost" className="rounded border px-2 py-1 text-xs" />
+                        <input name="completionNotes" placeholder="Completion notes" className="rounded border px-2 py-1 text-xs" />
+                        <button className="rounded bg-emerald-700 px-3 py-1 text-xs text-white">Mark completed</button>
+                      </form>
+                    ) : null}
+                    {(order.status === WorkOrderStatus.OPEN ||
+                      order.status === WorkOrderStatus.DISPATCHED ||
+                      order.status === WorkOrderStatus.IN_PROGRESS) ? (
+                      <form action={updateWorkOrderStatusAction} className="flex flex-wrap gap-2 items-center">
+                        <input type="hidden" name="workOrderId" value={order.id} />
+                        <input type="hidden" name="status" value={WorkOrderStatus.CANCELLED} />
+                        <input name="cancelReason" placeholder="Cancel reason" className="rounded border px-2 py-1 text-xs" />
+                        <button className="rounded border border-red-200 px-3 py-1 text-xs text-red-700">Cancel</button>
+                      </form>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>

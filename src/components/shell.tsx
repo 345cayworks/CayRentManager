@@ -3,6 +3,7 @@ import { LeaseAlertSnapshotStatus, RecordStatus, UserRole } from '@prisma/client
 import { getActiveUser, getUserLandlordMemberships } from '@/lib/auth/guards';
 import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
 import { prisma } from '@/lib/db/prisma';
+import { getOnboardingState } from '@/lib/onboarding/state';
 import { SignOutPanel } from '@/components/sign-out-panel';
 
 type NavLink = { href: string; label: string; badge?: number };
@@ -44,15 +45,24 @@ const tenantLinks: NavLink[] = [
 
 const operationalLinks: NavLink[] = [{ href: '/unauthorized', label: 'Access Pending' }];
 
+const vendorLinks: NavLink[] = [
+  { href: '/vendor/dashboard', label: 'Dashboard' },
+  { href: '/vendor/dashboard?tab=completed', label: 'Completed Work' },
+  { href: '/account/profile', label: 'Profile' },
+];
+
 const LANDLORD_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.LANDLORD,
   UserRole.PROPERTY_MANAGER,
   UserRole.ACCOUNTANT,
 ]);
 
-const OPERATIONAL_ROLES: ReadonlySet<UserRole> = new Set([
+const VENDOR_PORTAL_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.VENDOR,
   UserRole.MAINTENANCE_PROVIDER,
+]);
+
+const OPERATIONAL_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.CONCIERGE_AGENT,
   UserRole.GUEST,
 ]);
@@ -72,11 +82,28 @@ async function landlordLinksWithAlertBadge(userId: string): Promise<NavLink[]> {
     return baseLandlordLinks;
   }
 
-  if (activeAlertCount === 0) return baseLandlordLinks;
+  let onboardingBadge = 0;
+  try {
+    const state = await getOnboardingState(landlordId);
+    if (state.shouldNudge && state.remainingCount > 0) {
+      onboardingBadge = state.remainingCount;
+    }
+  } catch {
+    // Onboarding state unreachable → render nav without the badge.
+    onboardingBadge = 0;
+  }
 
-  return baseLandlordLinks.map((link) =>
-    link.href === '/alerts' ? { ...link, badge: activeAlertCount } : link,
-  );
+  if (activeAlertCount === 0 && onboardingBadge === 0) return baseLandlordLinks;
+
+  return baseLandlordLinks.map((link) => {
+    if (link.href === '/alerts' && activeAlertCount > 0) {
+      return { ...link, badge: activeAlertCount };
+    }
+    if (link.href === '/onboarding' && onboardingBadge > 0) {
+      return { ...link, badge: onboardingBadge };
+    }
+    return link;
+  });
 }
 
 async function linksForRole(role: UserRole | undefined, userId: string | undefined): Promise<NavLink[]> {
@@ -87,6 +114,7 @@ async function linksForRole(role: UserRole | undefined, userId: string | undefin
     if (!userId) return baseLandlordLinks;
     return landlordLinksWithAlertBadge(userId);
   }
+  if (VENDOR_PORTAL_ROLES.has(role)) return vendorLinks;
   if (OPERATIONAL_ROLES.has(role)) return operationalLinks;
   return [];
 }

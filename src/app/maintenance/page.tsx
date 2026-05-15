@@ -1,9 +1,16 @@
 import Link from 'next/link';
-import { MaintenancePriority, MaintenanceStatus } from '@prisma/client';
+import { MaintenancePriority, MaintenanceStatus, WorkOrderStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { assignMaintenanceVendorAction, createMaintenanceVendorAction, createMaintenanceWorkOrderAction, updateMaintenanceStatusAction } from '@/server/actions';
+import {
+  assignMaintenanceVendorAction,
+  createMaintenanceVendorAction,
+  createMaintenanceWorkOrderAction,
+  dispatchWorkOrderAction,
+  updateMaintenanceStatusAction,
+} from '@/server/actions';
+import { formatSlaCountdown, getSlaStatus, type SlaStatus } from '@/lib/maintenance/sla';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +18,28 @@ const statuses: MaintenanceStatus[] = [MaintenanceStatus.OPEN, MaintenanceStatus
 
 function badge(value: string) {
   return <span className="inline-flex rounded-full border bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">{value.replaceAll('_', ' ')}</span>;
+}
+
+function slaBadge(status: SlaStatus, label: string) {
+  const tones: Record<SlaStatus, string> = {
+    ON_TRACK: 'bg-emerald-100 text-emerald-700',
+    AT_RISK: 'bg-amber-100 text-amber-700',
+    BREACHED: 'bg-red-100 text-red-700',
+    MET: 'bg-slate-100 text-slate-600',
+  };
+  return (
+    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${tones[status]}`}>
+      {label}
+    </span>
+  );
+}
+
+function renderSlaBadge(slaDueAt: Date | null, resolvedAt: Date | null) {
+  const status = getSlaStatus({ slaDueAt, resolvedAt });
+  if (status === 'MET') return slaBadge(status, 'SLA met');
+  if (status === 'BREACHED') return slaBadge(status, slaDueAt ? `SLA ${formatSlaCountdown(slaDueAt)}` : 'SLA breached');
+  if (status === 'AT_RISK') return slaBadge(status, slaDueAt ? `At risk · ${formatSlaCountdown(slaDueAt)}` : 'At risk');
+  return slaBadge(status, slaDueAt ? `On track · ${formatSlaCountdown(slaDueAt)}` : 'On track');
 }
 
 export default async function Page({
@@ -54,11 +83,11 @@ export default async function Page({
         vendor: true,
         attachments: true,
         comments: true,
-        workOrders: true,
+        workOrders: { orderBy: { createdAt: 'desc' } },
       },
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     }),
-    prisma.maintenanceVendor.findMany({ where: { landlordId }, orderBy: { name: 'asc' } }),
+    prisma.maintenanceVendor.findMany({ where: { landlordId, archivedAt: null }, orderBy: { name: 'asc' } }),
     prisma.property.findMany({ where: { landlordId }, orderBy: { name: 'asc' } }),
   ]);
 
@@ -114,6 +143,8 @@ export default async function Page({
           <span>{vendors.length} vendors</span>
           <span>·</span>
           <span>{vendors.filter((vendor) => vendor.approvedStatus).length} approved</span>
+          <span>·</span>
+          <Link href="/maintenance/vendors" className="text-brand-navy hover:underline">Manage vendors →</Link>
         </div>
       </section>
 
@@ -122,60 +153,75 @@ export default async function Page({
           <section key={status} className="rounded-xl bg-slate-50 border p-3 min-h-80">
             <h3 className="font-semibold mb-3">{status.replaceAll('_', ' ')}</h3>
             <div className="space-y-3">
-              {requests.filter((request) => request.status === status).map((request) => (
-                <article key={request.id} className="rounded-xl bg-white border shadow-sm p-4 space-y-3">
-                  <div>
-                    <h4 className="font-semibold">{request.title}</h4>
-                    <p className="text-sm text-slate-600">{request.tenant?.fullName ?? 'No tenant'} · {request.property.name}{request.unit ? ` / ${request.unit.unitName}` : ''}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {badge(request.category)}
-                    {badge(request.priority)}
-                    {request.permissionToEnter ? badge('Permission to enter') : null}
-                  </div>
-                  <p className="text-sm text-slate-700 line-clamp-3">{request.description}</p>
-                  <div className="text-xs text-slate-500">
-                    {request.attachments.length} files · {request.comments.length} comments · {request.workOrders.length} work orders
-                  </div>
-                  <div className="text-sm text-slate-600">Vendor: {request.vendor?.name ?? 'Not assigned'}</div>
+              {requests.filter((request) => request.status === status).map((request) => {
+                const latestWorkOrder = request.workOrders[0];
+                const canDispatch =
+                  latestWorkOrder &&
+                  latestWorkOrder.vendorId &&
+                  latestWorkOrder.status === WorkOrderStatus.OPEN;
+                return (
+                  <article key={request.id} className="rounded-xl bg-white border shadow-sm p-4 space-y-3">
+                    <div>
+                      <h4 className="font-semibold">{request.title}</h4>
+                      <p className="text-sm text-slate-600">{request.tenant?.fullName ?? 'No tenant'} · {request.property.name}{request.unit ? ` / ${request.unit.unitName}` : ''}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {badge(request.category)}
+                      {badge(request.priority)}
+                      {renderSlaBadge(request.slaDueAt, request.resolvedAt)}
+                      {request.permissionToEnter ? badge('Permission to enter') : null}
+                    </div>
+                    <p className="text-sm text-slate-700 line-clamp-3">{request.description}</p>
+                    <div className="text-xs text-slate-500">
+                      {request.attachments.length} files · {request.comments.length} comments · {request.workOrders.length} work orders
+                    </div>
+                    <div className="text-sm text-slate-600">Vendor: {request.vendor?.name ?? 'Not assigned'}</div>
 
-                  <Link href={`/maintenance/${request.id}`} className="inline-flex w-full items-center justify-center rounded border border-brand-navy px-3 py-2 text-sm font-medium text-brand-navy hover:bg-slate-50">
-                    Open request
-                  </Link>
+                    <Link href={`/maintenance/${request.id}`} className="inline-flex w-full items-center justify-center rounded border border-brand-navy px-3 py-2 text-sm font-medium text-brand-navy hover:bg-slate-50">
+                      Open request
+                    </Link>
 
-                  <form action={updateMaintenanceStatusAction} className="grid gap-2">
-                    <input type="hidden" name="maintenanceRequestId" value={request.id} />
-                    <select name="status" className="border rounded px-2 py-1 text-sm" defaultValue={request.status}>
-                      {statuses.map((nextStatus) => <option key={nextStatus} value={nextStatus}>{nextStatus.replaceAll('_', ' ')}</option>)}
-                    </select>
-                    <button className="rounded border px-2 py-1 text-sm">Update status</button>
-                  </form>
+                    <form action={updateMaintenanceStatusAction} className="grid gap-2">
+                      <input type="hidden" name="maintenanceRequestId" value={request.id} />
+                      <select name="status" className="border rounded px-2 py-1 text-sm" defaultValue={request.status}>
+                        {statuses.map((nextStatus) => <option key={nextStatus} value={nextStatus}>{nextStatus.replaceAll('_', ' ')}</option>)}
+                      </select>
+                      <button className="rounded border px-2 py-1 text-sm">Update status</button>
+                    </form>
 
-                  <form action={assignMaintenanceVendorAction} className="grid gap-2">
-                    <input type="hidden" name="maintenanceRequestId" value={request.id} />
-                    <select name="vendorId" className="border rounded px-2 py-1 text-sm" defaultValue={request.assignedVendorId ?? ''}>
-                      <option value="">Assign vendor</option>
-                      {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
-                    </select>
-                    <button className="rounded border px-2 py-1 text-sm">Assign</button>
-                  </form>
-
-                  <details>
-                    <summary className="cursor-pointer text-sm font-medium">Create work order</summary>
-                    <form action={createMaintenanceWorkOrderAction} className="grid gap-2 mt-2">
+                    <form action={assignMaintenanceVendorAction} className="grid gap-2">
                       <input type="hidden" name="maintenanceRequestId" value={request.id} />
                       <select name="vendorId" className="border rounded px-2 py-1 text-sm" defaultValue={request.assignedVendorId ?? ''}>
-                        <option value="">Vendor optional</option>
+                        <option value="">Assign vendor</option>
                         {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
                       </select>
-                      <input name="estimatedCost" type="number" step="0.01" placeholder="Estimated cost" className="border rounded px-2 py-1 text-sm" />
-                      <input name="scheduledDate" type="date" className="border rounded px-2 py-1 text-sm" />
-                      <textarea name="notes" placeholder="Work order notes" className="border rounded px-2 py-1 text-sm" rows={3} />
-                      <button className="rounded border px-2 py-1 text-sm">Create work order</button>
+                      <button className="rounded border px-2 py-1 text-sm">Assign</button>
                     </form>
-                  </details>
-                </article>
-              ))}
+
+                    {canDispatch ? (
+                      <form action={dispatchWorkOrderAction}>
+                        <input type="hidden" name="workOrderId" value={latestWorkOrder.id} />
+                        <button className="w-full rounded bg-brand-navy px-2 py-1 text-sm text-white">Dispatch work order</button>
+                      </form>
+                    ) : null}
+
+                    <details>
+                      <summary className="cursor-pointer text-sm font-medium">Create work order</summary>
+                      <form action={createMaintenanceWorkOrderAction} className="grid gap-2 mt-2">
+                        <input type="hidden" name="maintenanceRequestId" value={request.id} />
+                        <select name="vendorId" className="border rounded px-2 py-1 text-sm" defaultValue={request.assignedVendorId ?? ''}>
+                          <option value="">Vendor optional</option>
+                          {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
+                        </select>
+                        <input name="estimatedCost" type="number" step="0.01" placeholder="Estimated cost" className="border rounded px-2 py-1 text-sm" />
+                        <input name="scheduledDate" type="date" className="border rounded px-2 py-1 text-sm" />
+                        <textarea name="notes" placeholder="Work order notes" className="border rounded px-2 py-1 text-sm" rows={3} />
+                        <button className="rounded border px-2 py-1 text-sm">Create work order</button>
+                      </form>
+                    </details>
+                  </article>
+                );
+              })}
               {requests.filter((request) => request.status === status).length === 0 ? <p className="text-sm text-slate-500">No requests.</p> : null}
             </div>
           </section>

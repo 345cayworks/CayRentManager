@@ -2,13 +2,30 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserStatus } from '@prisma/client';
+import { SubscriptionStatus, UserStatus } from '@prisma/client';
+
+type SubscriptionSummary = {
+  status: SubscriptionStatus;
+  planName: string | null;
+  planAmount: number | null;
+  planCurrency: string;
+  intervalMonths: number;
+  isComplimentary: boolean;
+  currentPeriodEnd: string;
+  nextInvoiceAt: string | null;
+  trialEndsAt: string | null;
+  gracePeriodEndsAt: string | null;
+  complimentaryUntil: string | null;
+  outstandingAmount: number;
+};
 
 type LandlordProfile = {
   id: string;
   companyName: string;
   displayName: string;
   _count: { properties: number; units: number };
+  subscription?: SubscriptionSummary | null;
+  lastActivityAt?: string | null;
 };
 
 type LandlordUser = {
@@ -48,6 +65,46 @@ const actionDisplay: Record<string, string> = {
   reset_password: 'Reset password',
   set_temporary_password: 'Set temporary password',
 };
+
+const subscriptionStyles: Partial<Record<SubscriptionStatus, string>> = {
+  ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  TRIAL: 'bg-blue-50 text-blue-700 ring-blue-100',
+  COMPLIMENTARY: 'bg-violet-50 text-violet-700 ring-violet-100',
+  MANUAL_OVERRIDE: 'bg-violet-50 text-violet-700 ring-violet-100',
+  PAST_DUE: 'bg-red-50 text-red-700 ring-red-100',
+  GRACE_PERIOD: 'bg-amber-50 text-amber-700 ring-amber-100',
+  INACTIVE: 'bg-slate-100 text-slate-600 ring-slate-200',
+  CANCELLED: 'bg-slate-100 text-slate-600 ring-slate-200',
+};
+
+const subscriptionLabel: Partial<Record<SubscriptionStatus, string>> = {
+  ACTIVE: 'Active',
+  TRIAL: 'Trial',
+  COMPLIMENTARY: 'Complimentary',
+  MANUAL_OVERRIDE: 'Manual',
+  PAST_DUE: 'Past due',
+  GRACE_PERIOD: 'Grace period',
+  INACTIVE: 'Inactive',
+  CANCELLED: 'Cancelled',
+};
+
+function formatCurrency(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat('en-KY', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
+  } catch {
+    return `${currency} ${amount.toLocaleString()}`;
+  }
+}
+
+function formatRelativeDays(iso: string | null | undefined) {
+  if (!iso) return null;
+  const target = new Date(iso).getTime();
+  if (Number.isNaN(target)) return null;
+  const diffDays = Math.round((target - Date.now()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'today';
+  if (diffDays > 0) return `in ${diffDays}d`;
+  return `${Math.abs(diffDays)}d ago`;
+}
 
 function IconActionButton({
   title,
@@ -116,6 +173,7 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [subscriptionFilter, setSubscriptionFilter] = useState('');
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [selectedUser, setSelectedUser] = useState<LandlordUser | null>(null);
   const [actionType, setActionType] = useState<string>('');
@@ -137,20 +195,42 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
     return landlords.filter((landlord) => {
       const query = search.trim().toLowerCase();
       if (statusFilter && landlord.status !== statusFilter) return false;
+      if (subscriptionFilter) {
+        const subscription = landlord.ownedLandlords[0]?.subscription ?? null;
+        if (subscriptionFilter === 'NONE') {
+          if (subscription) return false;
+        } else if (subscriptionFilter === 'COMPLIMENTARY_FLAG') {
+          if (!subscription?.isComplimentary) return false;
+        } else if (subscriptionFilter === 'OUTSTANDING') {
+          if (!subscription || subscription.outstandingAmount <= 0) return false;
+        } else if (!subscription || subscription.status !== subscriptionFilter) {
+          return false;
+        }
+      }
       if (!query) return true;
-      const searchText = [landlord.fullName, landlord.name, landlord.email, landlord.phone, landlord.ownedLandlords[0]?.companyName, landlord.ownedLandlords[0]?.displayName]
+      const searchText = [landlord.fullName, landlord.name, landlord.email, landlord.phone, landlord.ownedLandlords[0]?.companyName, landlord.ownedLandlords[0]?.displayName, landlord.ownedLandlords[0]?.subscription?.planName]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return searchText.includes(query);
     });
-  }, [landlords, search, statusFilter]);
+  }, [landlords, search, statusFilter, subscriptionFilter]);
 
   const metrics = useMemo(() => {
     const active = landlords.filter((landlord) => landlord.status === UserStatus.ACTIVE).length;
     const pending = landlords.filter((landlord) => landlord.status === UserStatus.PENDING_INVITE || landlord.status === UserStatus.INVITED).length;
     const suspended = landlords.filter((landlord) => landlord.status === UserStatus.SUSPENDED).length;
-    return { active, pending, suspended };
+    const paying = landlords.filter((landlord) => {
+      const s = landlord.ownedLandlords[0]?.subscription;
+      return s && !s.isComplimentary && s.status === SubscriptionStatus.ACTIVE;
+    }).length;
+    const complimentary = landlords.filter((landlord) => landlord.ownedLandlords[0]?.subscription?.isComplimentary).length;
+    const pastDue = landlords.filter((landlord) => {
+      const s = landlord.ownedLandlords[0]?.subscription;
+      return s && (s.status === SubscriptionStatus.PAST_DUE || s.status === SubscriptionStatus.GRACE_PERIOD);
+    }).length;
+    const outstandingTotal = landlords.reduce((sum, landlord) => sum + (landlord.ownedLandlords[0]?.subscription?.outstandingAmount ?? 0), 0);
+    return { active, pending, suspended, paying, complimentary, pastDue, outstandingTotal };
   }, [landlords]);
 
   function closeModal() {
@@ -264,24 +344,27 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         {[
-          ['Active', metrics.active],
-          ['Pending', metrics.pending],
-          ['Suspended', metrics.suspended],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-950">{value}</p>
+          { label: 'Active', value: metrics.active.toString() },
+          { label: 'Paying', value: metrics.paying.toString() },
+          { label: 'Complimentary', value: metrics.complimentary.toString() },
+          { label: 'Past due', value: metrics.pastDue.toString() },
+          { label: 'Pending', value: metrics.pending.toString() },
+          { label: 'Outstanding', value: formatCurrency(metrics.outstandingTotal, 'KYD') },
+        ].map((card) => (
+          <div key={card.label} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{card.label}</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950">{card.value}</p>
           </div>
         ))}
       </section>
 
       <section className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+        <div className="grid gap-3 md:grid-cols-[1fr_160px_180px_auto]">
           <input
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-navy"
-            placeholder="Search landlord, company, email, phone..."
+            placeholder="Search landlord, company, email, plan..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -290,6 +373,17 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
             {Object.entries(statusLabels).map(([status, config]) => (
               <option key={status} value={status}>{config.label}</option>
             ))}
+          </select>
+          <select className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700" value={subscriptionFilter} onChange={(event) => setSubscriptionFilter(event.target.value)}>
+            <option value="">All subscriptions</option>
+            <option value="ACTIVE">Active (paid)</option>
+            <option value="TRIAL">Trial</option>
+            <option value="COMPLIMENTARY_FLAG">Complimentary</option>
+            <option value="PAST_DUE">Past due</option>
+            <option value="GRACE_PERIOD">Grace period</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="OUTSTANDING">Has outstanding balance</option>
+            <option value="NONE">No subscription</option>
           </select>
           <button className="h-9 rounded-lg bg-brand-navy px-4 text-sm font-medium text-white hover:opacity-90" onClick={() => setActiveModal('invite')}>
             Invite landlord
@@ -312,6 +406,7 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
                 <th className="px-4 py-2 font-semibold">Workspace</th>
                 <th className="px-4 py-2 font-semibold">Inventory</th>
                 <th className="px-4 py-2 font-semibold">Status</th>
+                <th className="px-4 py-2 font-semibold">Subscription</th>
                 <th className="px-4 py-2 font-semibold">Activity</th>
                 <th className="px-4 py-2 font-semibold text-right">Quick Actions</th>
               </tr>
@@ -323,6 +418,24 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
                 const companyName = profile?.companyName || profile?.displayName || 'No workspace yet';
                 const propertyCount = profile?._count.properties ?? 0;
                 const unitCount = profile?._count.units ?? 0;
+                const subscription = profile?.subscription ?? null;
+                const lastActivityAt = profile?.lastActivityAt ?? null;
+                const subscriptionPill = subscription
+                  ? subscription.isComplimentary
+                    ? { label: 'Complimentary', className: subscriptionStyles.COMPLIMENTARY ?? '' }
+                    : { label: subscriptionLabel[subscription.status] ?? subscription.status, className: subscriptionStyles[subscription.status] ?? 'bg-slate-50 text-slate-600 ring-slate-200' }
+                  : null;
+                const periodHint = subscription
+                  ? subscription.isComplimentary
+                    ? subscription.complimentaryUntil
+                      ? `Until ${new Date(subscription.complimentaryUntil).toLocaleDateString()}`
+                      : 'No expiry'
+                    : subscription.status === SubscriptionStatus.TRIAL && subscription.trialEndsAt
+                      ? `Trial ends ${formatRelativeDays(subscription.trialEndsAt) ?? new Date(subscription.trialEndsAt).toLocaleDateString()}`
+                      : subscription.status === SubscriptionStatus.GRACE_PERIOD && subscription.gracePeriodEndsAt
+                        ? `Grace ends ${formatRelativeDays(subscription.gracePeriodEndsAt) ?? new Date(subscription.gracePeriodEndsAt).toLocaleDateString()}`
+                        : `Renews ${formatRelativeDays(subscription.currentPeriodEnd) ?? new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+                  : null;
                 return (
                   <tr key={landlord.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3 align-top">
@@ -344,8 +457,30 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
                         {statusLabels[landlord.status]?.label || landlord.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3 align-top">
+                      {subscription && subscriptionPill ? (
+                        <div className="space-y-1">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${subscriptionPill.className}`}>
+                            {subscriptionPill.label}
+                          </span>
+                          <div className="text-[11px] text-slate-600">
+                            {subscription.planName ?? 'No plan'}
+                            {subscription.planAmount !== null ? (
+                              <span className="text-slate-400"> · {formatCurrency(subscription.planAmount, subscription.planCurrency)}/{subscription.intervalMonths === 1 ? 'mo' : `${subscription.intervalMonths}mo`}</span>
+                            ) : null}
+                          </div>
+                          {periodHint ? <div className="text-[11px] text-slate-500">{periodHint}</div> : null}
+                          {subscription.outstandingAmount > 0 ? (
+                            <div className="text-[11px] font-semibold text-red-600">{formatCurrency(subscription.outstandingAmount, subscription.planCurrency)} outstanding</div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">No subscription</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 align-top text-xs text-slate-500">
                       <div>Last login: {landlord.lastLoginAt ? new Date(landlord.lastLoginAt).toLocaleDateString() : '—'}</div>
+                      <div>Last activity: {lastActivityAt ? new Date(lastActivityAt).toLocaleDateString() : '—'}</div>
                       <div>Created: {new Date(landlord.createdAt).toLocaleDateString()}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
@@ -368,7 +503,7 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
               })}
               {visibleLandlords.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
                     No landlords match the current filters.
                   </td>
                 </tr>

@@ -4,11 +4,14 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { getCurrentMonthRange, calculateOccupancyRate } from '@/lib/finance/landlord-financials';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const { start: startOfMonth, end: endOfMonth } = getCurrentMonthRange();
 
@@ -120,7 +123,7 @@ export default async function Page() {
                   <div key={payment.id} className="flex justify-between">
                     <div>
                       <p className="font-medium">${Number(payment.amountPaid ?? 0).toFixed(2)}</p>
-                      <p className="text-sm text-slate-500">{payment.dueDate.toLocaleDateString()}</p>
+                      <p className="text-sm text-slate-500">{formatDate(payment.dueDate, tz)}</p>
                     </div>
                     <span className={`text-sm px-2 py-1 rounded ${
                       payment.status === 'PAID' ? 'bg-green-100 text-green-800' :
@@ -148,7 +151,7 @@ export default async function Page() {
                   <div key={expense.id} className="flex justify-between">
                     <div>
                       <p className="font-medium">{expense.category}</p>
-                      <p className="text-sm text-slate-500">{expense.expenseDate.toLocaleDateString()}</p>
+                      <p className="text-sm text-slate-500">{formatDate(expense.expenseDate, tz)}</p>
                     </div>
                     <span className="font-medium">${Number(expense.amount).toFixed(2)}</span>
                   </div>

@@ -7,6 +7,8 @@ import {
   createMaintenanceVendorAction,
   restoreMaintenanceVendorAction,
 } from '@/server/actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +23,7 @@ function statCard(label: string, value: number | string) {
 
 export default async function VendorsPage() {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const vendors = await prisma.maintenanceVendor.findMany({
     where: { landlordId },
@@ -123,7 +126,7 @@ export default async function VendorsPage() {
                     <Link className="font-medium text-brand-navy hover:underline" href={`/maintenance/vendors/${vendor.id}`}>
                       {vendor.name}
                     </Link>
-                    <p className="text-xs text-slate-500 mt-1">Added {vendor.createdAt.toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-500 mt-1">Added {formatDate(vendor.createdAt, tz)}</p>
                   </td>
                   <td className="px-4 py-4 text-slate-700">{vendor.specialty || '—'}</td>
                   <td className="px-4 py-4 text-slate-700">
@@ -204,7 +207,7 @@ export default async function VendorsPage() {
                 <tr key={vendor.id} className="align-top hover:bg-slate-50">
                   <td className="px-4 py-4 font-medium text-slate-800">{vendor.name}</td>
                   <td className="px-4 py-4 text-slate-700">{vendor.specialty || '—'}</td>
-                  <td className="px-4 py-4 text-slate-600">{vendor.archivedAt?.toLocaleDateString() ?? '—'}</td>
+                  <td className="px-4 py-4 text-slate-600">{formatDate(vendor.archivedAt, tz)}</td>
                   <td className="px-4 py-4">
                     <form action={restoreMaintenanceVendorAction}>
                       <input type="hidden" name="vendorId" value={vendor.id} />

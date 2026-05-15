@@ -135,6 +135,25 @@ Ongoing operational requirement:
 
 ---
 
+## Platform Time Preferences
+
+Status:
+
+```text
+Complete
+```
+
+Every visible date is now rendered through `formatDate`/`formatDateTime`
+(`src/lib/time/format.ts`) with a request-resolved timezone
+(`getEffectiveTimezone()` in `src/lib/time/effective.ts`). Resolution
+order: landlord workspace → tenant's landlord → vendor's landlord →
+platform default → built-in `America/Cayman`. Superadmins edit the
+platform default at `/admin/settings`; landlords edit their workspace
+preference under `/account/profile`. See `docs/PLATFORM_TIME_PREFS.md`
+for details.
+
+---
+
 ## Phase 2 — Superadmin Platform Management
 
 Status:
@@ -156,6 +175,7 @@ Implemented:
 - richer audit views at `/admin/audit` (filterable by actor, action, entity, paginated)
 - admin safety review at `/admin/safety` (live audit of guardrails and bootstrap policy state)
 - platform billing/plan management at `/admin/billing`
+- platform timezone + currency defaults at `/admin/settings`
 
 Deferred to later phases:
 
@@ -389,6 +409,7 @@ Note:
 /admin/users
 /admin/landlords
 /admin/audit
+/admin/settings
 ```
 
 ### Landlord Routes

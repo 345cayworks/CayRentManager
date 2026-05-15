@@ -11,6 +11,8 @@ import {
   voidPaymentAction,
 } from '@/server/actions';
 import { getCurrentMonthRange } from '@/lib/finance/landlord-financials';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +35,7 @@ function statusBadge(status: string) {
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const { start: startOfMonth, end: endOfMonth } = getCurrentMonthRange();
   const now = new Date();
@@ -156,7 +159,7 @@ export default async function Page() {
                     <td className="p-3 font-medium">{invoice.invoiceNo}</td>
                     <td className="p-3"><Link href={`/tenants/${invoice.tenant.id}`} className="text-brand-navy">{invoice.tenant.fullName}</Link></td>
                     <td className="p-3"><Link href={`/properties/${invoice.unit.property.id}`} className="text-brand-navy">{invoice.unit.property.name}</Link> / {invoice.unit.unitName}</td>
-                    <td className="p-3">{invoice.dueDate.toLocaleDateString()}</td>
+                    <td className="p-3">{formatDate(invoice.dueDate, tz)}</td>
                     <td className="p-3 text-right">{money(invoice.amount)}</td>
                     <td className="p-3 text-right">{money(invoice.amountPaid)}</td>
                     <td className="p-3 text-right">{money(invoice.balance)}</td>
@@ -213,7 +216,7 @@ export default async function Page() {
                     <td className="p-3"><Link href={`/tenants/${payment.tenant.id}`} className="text-brand-navy">{payment.tenant.fullName}</Link></td>
                     <td className="p-3">{payment.invoice?.invoiceNo ?? 'Manual'}</td>
                     <td className="p-3"><Link href={`/properties/${payment.unit.property.id}`} className="text-brand-navy">{payment.unit.property.name}</Link> / {payment.unit.unitName}</td>
-                    <td className="p-3">{payment.paymentDate?.toLocaleDateString() ?? '—'}</td>
+                    <td className="p-3">{formatDate(payment.paymentDate, tz)}</td>
                     <td className="p-3 text-right">{money(payment.amountPaid)}</td>
                     <td className="p-3 text-right">{money(payment.balance)}</td>
                     <td className="p-3">{statusBadge(payment.status)}</td>

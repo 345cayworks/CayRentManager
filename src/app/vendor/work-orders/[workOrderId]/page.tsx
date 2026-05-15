@@ -10,6 +10,8 @@ import {
   vendorCompleteWorkOrderAction,
 } from '@/server/actions';
 import { formatSlaCountdown, getSlaStatus, type SlaStatus } from '@/lib/maintenance/sla';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate, formatDateTime } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +45,7 @@ function renderSlaBadge(slaDueAt: Date | null, resolvedAt: Date | null) {
 
 export default async function VendorWorkOrderDetail({ params }: { params: { workOrderId: string } }) {
   const { vendor } = await requireVendorUser();
+  const tz = await getEffectiveTimezone();
 
   const workOrder = await prisma.maintenanceWorkOrder.findFirst({
     where: { id: params.workOrderId, vendorId: vendor.id },
@@ -88,20 +91,20 @@ export default async function VendorWorkOrderDetail({ params }: { params: { work
         <p className="mt-5 whitespace-pre-line text-slate-700">{request.description}</p>
         <div className="mt-5 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
           <div className="rounded-lg bg-slate-50 p-3">
-            <span className="font-medium">Dispatched:</span> {workOrder.dispatchedAt ? workOrder.dispatchedAt.toLocaleString() : '—'}
+            <span className="font-medium">Dispatched:</span> {formatDateTime(workOrder.dispatchedAt, tz)}
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <span className="font-medium">Started:</span> {workOrder.startedAt ? workOrder.startedAt.toLocaleString() : '—'}
+            <span className="font-medium">Started:</span> {formatDateTime(workOrder.startedAt, tz)}
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <span className="font-medium">Acknowledged:</span> {workOrder.vendorAcknowledgedAt ? workOrder.vendorAcknowledgedAt.toLocaleString() : '—'}
+            <span className="font-medium">Acknowledged:</span> {formatDateTime(workOrder.vendorAcknowledgedAt, tz)}
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <span className="font-medium">Completed:</span> {workOrder.completedAt ? workOrder.completedAt.toLocaleString() : '—'}
+            <span className="font-medium">Completed:</span> {formatDateTime(workOrder.completedAt, tz)}
           </div>
           {workOrder.scheduledDate ? (
             <div className="rounded-lg bg-slate-50 p-3">
-              <span className="font-medium">Scheduled:</span> {workOrder.scheduledDate.toLocaleDateString()}
+              <span className="font-medium">Scheduled:</span> {formatDate(workOrder.scheduledDate, tz)}
             </div>
           ) : null}
           {workOrder.estimatedCost !== null && workOrder.estimatedCost !== undefined ? (
@@ -163,7 +166,7 @@ export default async function VendorWorkOrderDetail({ params }: { params: { work
             <div key={comment.id} className="rounded-xl border bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
                 <span>{comment.author.name ?? comment.author.email}</span>
-                <span>{comment.createdAt.toLocaleString()}</span>
+                <span>{formatDateTime(comment.createdAt, tz)}</span>
               </div>
               <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{comment.message}</p>
             </div>

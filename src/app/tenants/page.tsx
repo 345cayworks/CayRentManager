@@ -5,12 +5,10 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { deactivateTenantAction, inviteTenantAction } from '@/server/actions';
 import { CopyInviteLinkButton } from '@/components/copy-invite-link';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDateTime } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
-
-function formatDate(value: Date | null | undefined) {
-  return value ? new Date(value).toLocaleString() : 'n/a';
-}
 
 function humanizeStatus(status: string) {
   return status.charAt(0) + status.slice(1).toLowerCase();
@@ -18,6 +16,8 @@ function humanizeStatus(status: string) {
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
+  const fmt = (v: Date | null | undefined) => (v ? formatDateTime(v, tz) : 'n/a');
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '');
   const [units, tenants, invitations] = await Promise.all([
     prisma.unit.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, include: { property: true }, orderBy: { unitName: 'asc' } }),
@@ -104,14 +104,14 @@ export default async function Page() {
                 </div>
                 <div className="grid gap-2 text-sm text-slate-700">
                   <div>
-                    <span className="font-medium">Created:</span> {formatDate(invite.createdAt)}
+                    <span className="font-medium">Created:</span> {fmt(invite.createdAt)}
                   </div>
                   <div>
-                    <span className="font-medium">Expires:</span> {formatDate(invite.expiresAt)}
+                    <span className="font-medium">Expires:</span> {fmt(invite.expiresAt)}
                   </div>
                   {invite.acceptedAt ? (
                     <div>
-                      <span className="font-medium">Accepted:</span> {formatDate(invite.acceptedAt)}
+                      <span className="font-medium">Accepted:</span> {fmt(invite.acceptedAt)}
                     </div>
                   ) : null}
                   <div>

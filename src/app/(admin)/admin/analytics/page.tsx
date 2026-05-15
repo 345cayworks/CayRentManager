@@ -11,6 +11,8 @@ import {
 import { Shell } from '@/components/shell';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +41,7 @@ function pct(part: number, total: number) {
 
 export default async function Page() {
   await requireSuperadmin();
+  const tz = await getEffectiveTimezone();
 
   const now = new Date();
   const startCurrent = startOfMonth(now, 0);
@@ -243,7 +246,7 @@ export default async function Page() {
                       <p className="truncate text-sm font-medium text-slate-950">{user.fullName ?? user.email}</p>
                       <p className="truncate text-[11px] text-slate-500">{user.email} · {user.role}</p>
                     </div>
-                    <span className="shrink-0 text-[11px] text-slate-500">{new Date(user.createdAt).toLocaleDateString()}</span>
+                    <span className="shrink-0 text-[11px] text-slate-500">{formatDate(user.createdAt, tz)}</span>
                   </li>
                 ))}
               </ul>

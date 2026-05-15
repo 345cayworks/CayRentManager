@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Shell } from '@/components/shell';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDateTime as formatDateTimeHelper } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,15 +33,6 @@ function buildQueryString(params: Record<string, string | number | undefined>) {
   return qs ? `?${qs}` : '';
 }
 
-function formatDateTime(date: Date) {
-  return new Date(date).toLocaleString('en-KY', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function detailSummary(details: unknown): string {
   if (!details || typeof details !== 'object') return '';
@@ -68,6 +61,9 @@ function getIp(details: unknown): string | null {
 }
 
 export default async function Page({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const tz = await getEffectiveTimezone();
+  const formatDateTime = (date: Date) => formatDateTimeHelper(date, tz);
+
   await requireSuperadmin();
   const params = await searchParams;
 

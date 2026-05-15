@@ -2,24 +2,20 @@ import Link from 'next/link';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import {
+  SUPPORTED_CURRENCIES,
+  SUPPORTED_TIMEZONES,
+  formatDateTime,
+} from '@/lib/time/format';
 import { updateCompanyProfileAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
-const currencyOptions = ['KYD', 'USD', 'CAD', 'GBP', 'EUR'];
-
-function formatDate(value: Date | null | undefined) {
-  if (!value) return null;
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return null;
-  }
-}
-
 export default async function CompanyProfilePage() {
   const { landlordId } = await getCurrentLandlordWorkspace();
   const profile = await prisma.landlordProfile.findUnique({ where: { id: landlordId } });
+  const tz = await getEffectiveTimezone();
 
   if (!profile) {
     return (
@@ -29,7 +25,9 @@ export default async function CompanyProfilePage() {
     );
   }
 
-  const savedAt = formatDate(profile.companyProfileCompletedAt);
+  const savedAt = profile.companyProfileCompletedAt
+    ? formatDateTime(profile.companyProfileCompletedAt, tz)
+    : null;
 
   return (
     <Shell title="Company profile">
@@ -189,20 +187,26 @@ export default async function CompanyProfilePage() {
                   defaultValue={profile.currency ?? 'KYD'}
                   className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
                 >
-                  {currencyOptions.map((code) => (
-                    <option key={code} value={code}>
-                      {code}
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="block text-sm">
                 <span className="font-medium text-slate-700">Timezone</span>
-                <input
+                <select
                   name="timezone"
                   defaultValue={profile.timezone ?? 'America/Cayman'}
                   className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
-                />
+                >
+                  {SUPPORTED_TIMEZONES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           </fieldset>

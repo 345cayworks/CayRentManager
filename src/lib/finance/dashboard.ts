@@ -31,7 +31,10 @@ export interface LandlordDashboardMetrics {
   rentCollectionStatus: RentCollectionStatusCounts;
 }
 
-export async function getLandlordDashboardMetrics(landlordId: string): Promise<LandlordDashboardMetrics> {
+export async function getLandlordDashboardMetrics(
+  landlordId: string,
+  timezone: string = 'America/Cayman',
+): Promise<LandlordDashboardMetrics> {
   const now = new Date();
   const { start: monthStart, end: monthEnd } = getMonthRange(0);
   const { start: prevMonthStart, end: prevMonthEnd } = getMonthRange(1);
@@ -179,6 +182,7 @@ export async function getLandlordDashboardMetrics(landlordId: string): Promise<L
     paymentsSixMonths as never,
     expensesSixMonths as never,
     6,
+    timezone,
   );
 
   const rentCollectionStatus = getRentCollectionStatusCounts(paymentsThisMonth);

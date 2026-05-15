@@ -1,10 +1,25 @@
 import Link from 'next/link';
+import { UserRole } from '@prisma/client';
 import { Shell } from '@/components/shell';
-import { requireAuthAllowPasswordChange } from '@/lib/auth/guards';
+import { getUserLandlordMemberships, requireAuthAllowPasswordChange } from '@/lib/auth/guards';
+import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
 import { prisma } from '@/lib/db/prisma';
-import { updateUserProfileAction } from '@/server/actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import {
+  SUPPORTED_CURRENCIES,
+  SUPPORTED_TIMEZONES,
+  formatDate,
+  formatDateTime,
+} from '@/lib/time/format';
+import { updateUserProfileAction, updateWorkspaceTimePrefsAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
+
+const WORKSPACE_ROLES: ReadonlySet<UserRole> = new Set([
+  UserRole.LANDLORD,
+  UserRole.PROPERTY_MANAGER,
+  UserRole.ACCOUNTANT,
+]);
 
 export default async function Page({
   searchParams,
@@ -13,6 +28,27 @@ export default async function Page({
 }) {
   const auth = await requireAuthAllowPasswordChange();
   const justUpdated = searchParams?.updated === '1';
+  const tz = await getEffectiveTimezone();
+
+  let workspaceProfile: { id: string; timezone: string; currency: string; displayName: string } | null = null;
+  if (WORKSPACE_ROLES.has(auth.role)) {
+    const memberships = await getUserLandlordMemberships(auth.userId);
+    const activeLandlordId = getActiveLandlordWorkspace(memberships.map((m) => m.landlordId));
+    if (activeLandlordId) {
+      const profile = await prisma.landlordProfile.findUnique({
+        where: { id: activeLandlordId },
+        select: { id: true, timezone: true, currency: true, displayName: true },
+      });
+      if (profile) {
+        workspaceProfile = {
+          id: profile.id,
+          timezone: profile.timezone || 'America/Cayman',
+          currency: profile.currency || 'KYD',
+          displayName: profile.displayName,
+        };
+      }
+    }
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: auth.userId },
@@ -67,13 +103,13 @@ export default async function Page({
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-500">Member since</p>
                 <p className="text-sm text-slate-900">
-                  {user.createdAt.toLocaleDateString()}
+                  {formatDate(user.createdAt, tz)}
                 </p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-500">Last login</p>
                 <p className="text-sm text-slate-900">
-                  {user.lastLoginAt ? user.lastLoginAt.toLocaleString() : '—'}
+                  {formatDateTime(user.lastLoginAt, tz)}
                 </p>
               </div>
             </div>
@@ -121,6 +157,57 @@ export default async function Page({
               </div>
             </form>
           </section>
+
+          {workspaceProfile && (
+            <section className="rounded-xl border bg-white p-4 shadow-sm">
+              <h3 className="font-semibold text-slate-950">Workspace Settings</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Times and amounts across this workspace will display using these
+                settings.
+              </p>
+              <form
+                action={updateWorkspaceTimePrefsAction}
+                className="mt-4 grid gap-3 sm:grid-cols-2"
+              >
+                <label className="text-sm">
+                  <span className="text-slate-500">Timezone</span>
+                  <select
+                    name="timezone"
+                    defaultValue={workspaceProfile.timezone}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  >
+                    {SUPPORTED_TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="text-slate-500">Currency</span>
+                  <select
+                    name="currency"
+                    defaultValue={workspaceProfile.currency}
+                    className="mt-1 block w-full rounded border px-3 py-2 text-slate-950 bg-white"
+                  >
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="rounded bg-brand-navy px-4 py-2 text-sm font-medium text-white"
+                  >
+                    Save workspace settings
+                  </button>
+                </div>
+              </form>
+            </section>
+          )}
         </div>
 
         <aside className="space-y-4">

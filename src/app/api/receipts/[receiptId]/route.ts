@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { UserRole } from '@prisma/client';
 import { getActiveUser } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { getPlatformSettings } from '@/lib/settings/platform';
+import { formatDate, formatDateTime } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +61,13 @@ export async function GET(_request: Request, { params }: { params: { receiptId: 
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const landlordTzProfile = await prisma.landlordProfile.findUnique({
+    where: { id: receipt.payment.landlordId },
+    select: { timezone: true },
+  });
+  const tz =
+    landlordTzProfile?.timezone || (await getPlatformSettings()).timezone;
+
   const html = `<!doctype html>
 <html>
 <head>
@@ -102,7 +111,7 @@ export async function GET(_request: Request, { params }: { params: { receiptId: 
         <tr><th>Invoice</th><td>${escapeHtml(receipt.payment.invoice?.invoiceNo ?? 'Manual payment')}</td></tr>
         <tr><th>Property</th><td>${escapeHtml(receipt.payment.property.name)}</td></tr>
         <tr><th>Unit</th><td>${escapeHtml(receipt.payment.unit.unitName)}</td></tr>
-        <tr><th>Payment Date</th><td>${escapeHtml(receipt.payment.paymentDate?.toLocaleDateString() ?? '—')}</td></tr>
+        <tr><th>Payment Date</th><td>${escapeHtml(formatDate(receipt.payment.paymentDate, tz))}</td></tr>
         <tr><th>Payment Method</th><td>${escapeHtml(receipt.payment.paymentMethod ?? '—')}</td></tr>
         <tr><th>Amount Paid</th><td class="right">${escapeHtml(money(receipt.payment.amountPaid))}</td></tr>
         <tr><th>Remaining Balance</th><td class="right">${escapeHtml(money(receipt.payment.balance))}</td></tr>
@@ -112,7 +121,7 @@ export async function GET(_request: Request, { params }: { params: { receiptId: 
     <div class="footer">
       <p>This receipt confirms payment recorded in CayRentManager. Please retain it for your records.</p>
       <p>For Cayman Islands short-term tourist accommodation transactions, tourist accommodation tax treatment should be reviewed separately according to the property type and licensing status.</p>
-      <p>Generated on ${escapeHtml(new Date().toLocaleString())}</p>
+      <p>Generated on ${escapeHtml(formatDateTime(new Date(), tz))}</p>
     </div>
   </main>
 </body>

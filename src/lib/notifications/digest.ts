@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/time/format';
 import { filterAlertsForUser, type AlertPreferenceInput, type FilterableAlert } from './preferences';
 
 export type DigestAlert = FilterableAlert & {
@@ -44,8 +45,16 @@ export function buildAlertDigest(params: {
   preference: AlertPreferenceInput;
   generatedAt?: Date;
   appUrl?: string;
+  timezone?: string;
 }): DigestResult {
-  const { workspaceName, alerts, preference, generatedAt = new Date(), appUrl } = params;
+  const {
+    workspaceName,
+    alerts,
+    preference,
+    generatedAt = new Date(),
+    appUrl,
+    timezone = 'America/Cayman',
+  } = params;
 
   if (!preference.digestEnabled) {
     return { alertCount: 0, subject: '', body: '', bodyHtml: '', alertKeys: [] };
@@ -66,7 +75,7 @@ export function buildAlertDigest(params: {
     return ad - bd;
   });
 
-  const dateLabel = generatedAt.toLocaleDateString('en-US', {
+  const dateLabel = formatDate(generatedAt, timezone, {
     weekday: 'long',
     month: 'short',
     day: 'numeric',

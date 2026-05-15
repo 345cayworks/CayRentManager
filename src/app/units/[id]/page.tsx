@@ -5,6 +5,8 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { archiveUnitAction, updateUnitAction } from '@/server/actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,7 @@ export default async function Page({
   searchParams?: { edit?: string; updated?: string };
 }) {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
   const editOpen = searchParams?.edit === '1';
   const justUpdated = searchParams?.updated === '1';
 
@@ -205,7 +208,7 @@ export default async function Page({
                   <li key={payment.id} className="flex justify-between">
                     <div>
                       <p>{payment.tenant.fullName}</p>
-                      <p className="text-slate-500 text-sm">{payment.dueDate.toLocaleDateString()}</p>
+                      <p className="text-slate-500 text-sm">{formatDate(payment.dueDate, tz)}</p>
                     </div>
                     <p>${Number(payment.amountPaid ?? 0).toFixed(2)}</p>
                   </li>

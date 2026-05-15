@@ -4,6 +4,7 @@ import { getActiveUser, getUserLandlordMemberships } from '@/lib/auth/guards';
 import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
 import { prisma } from '@/lib/db/prisma';
 import { getOnboardingState } from '@/lib/onboarding/state';
+import { getEffectiveTimezone } from '@/lib/time/effective';
 import { SignOutPanel } from '@/components/sign-out-panel';
 
 type NavLink = { href: string; label: string; badge?: number };
@@ -133,6 +134,14 @@ function Badge({ count }: { count: number }) {
 export async function Shell({ title, children }: { title: string; children?: React.ReactNode }) {
   const user = await getActiveUser();
   const links = await linksForRole(user?.role, user?.userId);
+  let timezone: string | null = null;
+  if (user) {
+    try {
+      timezone = await getEffectiveTimezone();
+    } catch {
+      timezone = null;
+    }
+  }
 
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr]">
@@ -152,6 +161,9 @@ export async function Shell({ title, children }: { title: string; children?: Rea
         </nav>
         {user && (
           <div className="mt-auto">
+            {timezone && (
+              <p className="mb-2 text-xs text-slate-400">Times shown in {timezone}</p>
+            )}
             <SignOutPanel email={user.email} role={user.role} name={user.name} />
           </div>
         )}

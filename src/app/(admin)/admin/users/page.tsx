@@ -3,6 +3,8 @@ import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { assignUserRoleAction, disableUserAction, reactivateUserAction } from '@/server/actions';
 import { UserRole, UserStatus } from '@prisma/client';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate as formatDateHelper } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +17,10 @@ const statusStyles: Record<string, string> = {
   INACTIVE: 'bg-slate-50 text-slate-600 ring-slate-200',
 };
 
-function formatDate(value: Date | null | undefined) {
-  return value ? new Date(value).toLocaleDateString() : '—';
-}
-
 export default async function Page() {
   await requireSuperadmin();
+  const tz = await getEffectiveTimezone();
+  const formatDate = (value: Date | null | undefined) => formatDateHelper(value, tz);
   const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
 
   const activeCount = users.filter((user) => user.status === UserStatus.ACTIVE).length;

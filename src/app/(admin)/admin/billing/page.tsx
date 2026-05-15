@@ -6,6 +6,8 @@ import { isBillingTableMissingError } from '@/lib/billing/safe-query';
 import { isComplimentarySubscription } from '@/lib/billing/policy';
 import { Shell } from '@/components/shell';
 import { BillingManagementClient } from '@/components/admin/billing-management-client';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 function statusClass(status: string, complimentary: boolean) {
   if (complimentary) {
@@ -27,6 +29,7 @@ function statusClass(status: string, complimentary: boolean) {
 
 export default async function AdminBillingPage() {
   await requireSuperadmin();
+  const tz = await getEffectiveTimezone();
 
   let subs: any[] = [];
   let activePlans: { id: string; code: string; name: string; amount: number; currency: string; intervalMonths: number }[] = [];
@@ -90,13 +93,13 @@ export default async function AdminBillingPage() {
       nextInvoiceLabel: complimentary
         ? 'None'
         : s.nextInvoiceAt
-          ? new Date(s.nextInvoiceAt).toLocaleDateString()
+          ? formatDate(s.nextInvoiceAt, tz)
           : '—',
       currentPeriodEndLabel: s.currentPeriodEnd
-        ? new Date(s.currentPeriodEnd).toLocaleDateString()
+        ? formatDate(s.currentPeriodEnd, tz)
         : '—',
       complimentaryUntilLabel: s.complimentaryUntil
-        ? new Date(s.complimentaryUntil).toLocaleDateString()
+        ? formatDate(s.complimentaryUntil, tz)
         : 'No end date',
       latestInvoiceId: inv?.id ?? null,
       latestInvoiceNumber: inv?.invoiceNumber ?? null,

@@ -5,6 +5,8 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { buildLeaseAlertFeed, type LeaseAlertSeverity } from '@/lib/leases/lease-alerts';
 import { createLeaseAction, expireLeaseAction, terminateLeaseAction } from '@/server/actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +74,7 @@ function severityCard(label: LeaseAlertSeverity, count: number) {
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const now = new Date();
   const next60Days = addDays(now, 60);
@@ -255,7 +258,7 @@ export default async function Page() {
                       </Link>
 
                       <p className="text-sm text-slate-600 mt-1">
-                        Ends {lease.endDate.toLocaleDateString()}
+                        Ends {formatDate(lease.endDate, tz)}
                       </p>
                     </div>
 

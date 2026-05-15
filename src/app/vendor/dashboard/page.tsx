@@ -4,6 +4,8 @@ import { Shell } from '@/components/shell';
 import { requireVendorUser } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { formatSlaCountdown, getSlaStatus, type SlaStatus } from '@/lib/maintenance/sla';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +39,7 @@ function statusBadge(status: WorkOrderStatus) {
 
 export default async function VendorDashboardPage({ searchParams }: { searchParams?: { tab?: string } }) {
   const { vendor } = await requireVendorUser();
+  const tz = await getEffectiveTimezone();
   const activeTab = searchParams?.tab === 'completed' ? 'completed' : 'active';
 
   const [active, completed] = await Promise.all([
@@ -164,7 +167,7 @@ export default async function VendorDashboardPage({ searchParams }: { searchPara
                   <p className="text-xs text-slate-500 mt-1">{wo.maintenanceRequest.property.name}</p>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>Completed {wo.completedAt ? wo.completedAt.toLocaleDateString() : '—'}</span>
+                  <span>Completed {formatDate(wo.completedAt, tz)}</span>
                   {statusBadge(wo.status)}
                 </div>
               </div>

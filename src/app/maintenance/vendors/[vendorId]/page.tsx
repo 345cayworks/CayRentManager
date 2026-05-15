@@ -10,6 +10,8 @@ import {
   restoreMaintenanceVendorAction,
   updateMaintenanceVendorAction,
 } from '@/server/actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate, formatDateTime } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +37,7 @@ function formatDateInput(date: Date | null | undefined) {
 
 export default async function VendorDetailPage({ params }: { params: { vendorId: string } }) {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const vendor = await prisma.maintenanceVendor.findFirst({
     where: { id: params.vendorId, landlordId },
@@ -194,10 +197,10 @@ export default async function VendorDetailPage({ params }: { params: { vendorId:
                         </Link>
                       </td>
                       <td className="px-3 py-2">{badge(wo.status.replaceAll('_', ' '))}</td>
-                      <td className="px-3 py-2 text-slate-600">{wo.dispatchedAt?.toLocaleString() ?? '—'}</td>
-                      <td className="px-3 py-2 text-slate-600">{wo.startedAt?.toLocaleString() ?? '—'}</td>
-                      <td className="px-3 py-2 text-slate-600">{wo.completedAt?.toLocaleString() ?? '—'}</td>
-                      <td className="px-3 py-2 text-slate-600">{wo.vendorAcknowledgedAt?.toLocaleString() ?? '—'}</td>
+                      <td className="px-3 py-2 text-slate-600">{formatDateTime(wo.dispatchedAt, tz)}</td>
+                      <td className="px-3 py-2 text-slate-600">{formatDateTime(wo.startedAt, tz)}</td>
+                      <td className="px-3 py-2 text-slate-600">{formatDateTime(wo.completedAt, tz)}</td>
+                      <td className="px-3 py-2 text-slate-600">{formatDateTime(wo.vendorAcknowledgedAt, tz)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -218,7 +221,7 @@ export default async function VendorDetailPage({ params }: { params: { vendorId:
                   Linked to <span className="font-medium">{vendor.user?.email}</span>
                 </p>
                 {vendor.portalEnabledAt ? (
-                  <p className="text-xs text-slate-500">Enabled {vendor.portalEnabledAt.toLocaleDateString()}</p>
+                  <p className="text-xs text-slate-500">Enabled {formatDate(vendor.portalEnabledAt, tz)}</p>
                 ) : null}
                 <form action={disableVendorPortalAction}>
                   <input type="hidden" name="vendorId" value={vendor.id} />
@@ -247,16 +250,16 @@ export default async function VendorDetailPage({ params }: { params: { vendorId:
             <dl className="mt-3 space-y-2">
               <div className="flex justify-between gap-3">
                 <dt>Created</dt>
-                <dd>{vendor.createdAt.toLocaleDateString()}</dd>
+                <dd>{formatDate(vendor.createdAt, tz)}</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt>Updated</dt>
-                <dd>{vendor.updatedAt.toLocaleDateString()}</dd>
+                <dd>{formatDate(vendor.updatedAt, tz)}</dd>
               </div>
               {vendor.archivedAt ? (
                 <div className="flex justify-between gap-3">
                   <dt>Archived</dt>
-                  <dd>{vendor.archivedAt.toLocaleDateString()}</dd>
+                  <dd>{formatDate(vendor.archivedAt, tz)}</dd>
                 </div>
               ) : null}
             </dl>

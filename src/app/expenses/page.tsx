@@ -5,11 +5,14 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { recordExpenseAction, voidExpenseAction } from '@/server/actions';
 import { getCurrentMonthRange } from '@/lib/finance/landlord-financials';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const { start: startOfMonth, end: endOfMonth } = getCurrentMonthRange();
 
@@ -95,7 +98,7 @@ export default async function Page() {
               <tbody className="divide-y">
                 {expenses.map((expense) => (
                   <tr key={expense.id}>
-                    <td className="p-3">{expense.expenseDate.toLocaleDateString()}</td>
+                    <td className="p-3">{formatDate(expense.expenseDate, tz)}</td>
                     <td className="p-3">{expense.category}</td>
                     <td className="p-3">
                       <Link href={`/properties/${expense.property.id}`} className="text-brand-navy">

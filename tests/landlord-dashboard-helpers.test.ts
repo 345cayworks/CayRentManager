@@ -97,7 +97,14 @@ describe('getRecentCashflowSeries', () => {
     const series = getRecentCashflowSeries([], [], 6);
     expect(series).toHaveLength(6);
     // Labels are short month names; the last entry should be the current month.
-    const expectedLastLabel = new Date().toLocaleDateString('en-US', { month: 'short' });
+    // getRecentCashflowSeries uses getMonthRange which constructs month boundaries
+    // in the process's local timezone, then renders the label in America/Cayman.
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const expectedLastLabel = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      timeZone: 'America/Cayman',
+    }).format(monthStart);
     expect(series[5].label).toBe(expectedLastLabel);
   });
 

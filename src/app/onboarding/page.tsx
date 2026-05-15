@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { getOnboardingState } from '@/lib/onboarding/state';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate as formatDateHelper } from '@/lib/time/format';
 import {
   dismissOnboardingAction,
   markOnboardingCompleteAction,
@@ -10,18 +12,12 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function formatDate(value: Date | null | undefined) {
-  if (!value) return null;
-  try {
-    return new Date(value).toLocaleDateString();
-  } catch {
-    return null;
-  }
-}
-
 export default async function OnboardingPage() {
   const { landlordId } = await getCurrentLandlordWorkspace();
   const state = await getOnboardingState(landlordId);
+  const tz = await getEffectiveTimezone();
+  const formatDate = (value: Date | null | undefined) =>
+    value ? formatDateHelper(value, tz) : null;
 
   const allDone = state.completedCount === state.totalCount;
 

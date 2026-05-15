@@ -2,11 +2,14 @@ import Link from 'next/link';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const leases = await prisma.lease.findMany({
     where: { landlordId, status: 'ACTIVE' },
@@ -93,8 +96,8 @@ export default async function Page() {
                           {lease.tenant.fullName}
                         </Link>
                       </td>
-                      <td className="p-3">{lease.startDate.toLocaleDateString()}</td>
-                      <td className="p-3">{lease.endDate.toLocaleDateString()}</td>
+                      <td className="p-3">{formatDate(lease.startDate, tz)}</td>
+                      <td className="p-3">{formatDate(lease.endDate, tz)}</td>
                       <td className="p-3 text-right">${Number(lease.rentAmount).toFixed(2)}</td>
                       <td className="p-3 text-right">${lease.outstandingBalance.toFixed(2)}</td>
                     </tr>

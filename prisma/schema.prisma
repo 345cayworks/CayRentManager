@@ -308,6 +308,13 @@ model LandlordProfile {
   outboundNotifications OutboundNotification[]
 }
 
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
 model SubscriptionPlan {
   id             String       @id @default(cuid())
   code           String       @unique

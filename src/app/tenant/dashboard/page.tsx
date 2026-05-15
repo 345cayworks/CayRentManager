@@ -4,6 +4,8 @@ import { Shell } from '@/components/shell';
 import { requireRole } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { uploadPaymentProofAction } from '@/server/actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,7 @@ function statusBadge(status: string) {
 
 export default async function Page() {
   const user = await requireRole([UserRole.TENANT, UserRole.SUPERADMIN]);
+  const tz = await getEffectiveTimezone();
   const tenant = await prisma.tenant.findFirst({
     where: user.role === UserRole.SUPERADMIN ? {} : { userId: user.userId },
     include: {
@@ -77,7 +80,7 @@ export default async function Page() {
                 </div>
                 <div>
                   <p className="text-slate-500">Due Date</p>
-                  <p className="font-medium">{nextOpenInvoice.dueDate.toLocaleDateString()}</p>
+                  <p className="font-medium">{formatDate(nextOpenInvoice.dueDate, tz)}</p>
                 </div>
                 <div>
                   <p className="text-slate-500">Balance</p>
@@ -171,7 +174,7 @@ export default async function Page() {
                       <tr key={invoice.id}>
                         <td className="p-3 font-medium">{invoice.invoiceNo}</td>
                         <td className="p-3">{invoice.property.name} / {invoice.unit.unitName}</td>
-                        <td className="p-3">{invoice.dueDate.toLocaleDateString()}</td>
+                        <td className="p-3">{formatDate(invoice.dueDate, tz)}</td>
                         <td className="p-3 text-right">{money(invoice.amount)}</td>
                         <td className="p-3 text-right">{money(invoice.amountPaid)}</td>
                         <td className="p-3 text-right">{money(invoice.balance)}</td>
@@ -207,7 +210,7 @@ export default async function Page() {
                   <tbody className="divide-y">
                     {tenant.payments.map((payment) => (
                       <tr key={payment.id}>
-                        <td className="p-3">{payment.paymentDate?.toLocaleDateString() ?? '—'}</td>
+                        <td className="p-3">{formatDate(payment.paymentDate, tz)}</td>
                         <td className="p-3">{payment.invoice?.invoiceNo ?? 'Manual'}</td>
                         <td className="p-3">{payment.property.name} / {payment.unit.unitName}</td>
                         <td className="p-3 text-right">{money(payment.amountPaid)}</td>

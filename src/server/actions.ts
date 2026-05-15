@@ -13,6 +13,8 @@ import { registerPublicLandlord } from '@/lib/services/registration';
 import { acceptTenantInvitation, createTenantInvitation } from '@/lib/services/invitations';
 import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 import { calculatePaymentBalance, calculatePaymentStatus, validatePaymentDates } from '@/lib/validation/payments';
+import { isSupportedCurrency, isSupportedTimezone } from '@/lib/time/format';
+import { setPlatformSetting } from '@/lib/settings/platform';
 
 const operationalRoles: UserRole[] = [
   UserRole.VENDOR,
@@ -1382,4 +1384,33 @@ export async function updateUserProfileAction(formData: FormData) {
   });
   revalidatePath('/account/profile');
   redirect('/account/profile?updated=1');
+}
+
+export async function updatePlatformSettingsAction(formData: FormData) {
+  const user = await requireSuperadmin();
+  const timezone = requiredText(formData, 'timezone');
+  const currency = requiredText(formData, 'currency');
+  if (!isSupportedTimezone(timezone)) throw new Error('Unsupported timezone.');
+  if (!isSupportedCurrency(currency)) throw new Error('Unsupported currency.');
+  await setPlatformSetting('timezone', timezone, user.userId);
+  await setPlatformSetting('currency', currency, user.userId);
+  await audit(user.userId, user.email, 'platform.settings_updated', 'SystemSetting', 'platform', undefined, { timezone, currency });
+  revalidatePath('/admin/settings');
+  revalidatePath('/', 'layout');
+}
+
+export async function updateWorkspaceTimePrefsAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const timezone = requiredText(formData, 'timezone');
+  const currency = requiredText(formData, 'currency');
+  if (!isSupportedTimezone(timezone)) throw new Error('Unsupported timezone.');
+  if (!isSupportedCurrency(currency)) throw new Error('Unsupported currency.');
+  await prisma.landlordProfile.update({
+    where: { id: landlordId },
+    data: { timezone, currency },
+  });
+  await audit(user.userId, user.email, 'workspace.time_prefs_updated', 'LandlordProfile', landlordId, landlordId, { timezone, currency });
+  revalidatePath('/account/profile');
+  revalidatePath('/onboarding/company-profile');
+  revalidatePath('/dashboard');
 }

@@ -5,6 +5,8 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { isBillingTableMissingError } from '@/lib/billing/safe-query';
 import { isComplimentarySubscription } from '@/lib/billing/policy';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 function statusBadge(status: string) {
   const styles: Record<string, string> = {
@@ -29,6 +31,7 @@ const payableInvoiceStatuses: ReadonlySet<SubscriptionInvoiceStatus> = new Set([
 
 export default async function AccountBillingPage() {
   const workspace = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   let subscription: any = null;
   let invoices: any[] = [];
@@ -133,7 +136,7 @@ export default async function AccountBillingPage() {
                     </div>
                     <div className="mt-2 text-lg font-semibold text-slate-900">
                       {subscription.currentPeriodEnd
-                        ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
+                        ? formatDate(subscription.currentPeriodEnd, tz)
                         : '-'}
                     </div>
                   </div>
@@ -146,7 +149,7 @@ export default async function AccountBillingPage() {
                       {complimentary
                         ? 'None'
                         : subscription.nextInvoiceAt
-                          ? new Date(subscription.nextInvoiceAt).toLocaleDateString()
+                          ? formatDate(subscription.nextInvoiceAt, tz)
                           : '-'}
                     </div>
                   </div>
@@ -180,7 +183,7 @@ export default async function AccountBillingPage() {
                   {subscription?.complimentaryUntil ? (
                     <div className="text-xs font-medium text-blue-700">
                       Complimentary until{' '}
-                      {new Date(subscription.complimentaryUntil).toLocaleDateString()}
+                      {formatDate(subscription.complimentaryUntil, tz)}
                     </div>
                   ) : (
                     <div className="text-xs font-medium text-blue-700">
@@ -258,7 +261,7 @@ export default async function AccountBillingPage() {
                           </td>
 
                           <td className="px-4 py-4 text-slate-700">
-                            {new Date(invoice.dueDate).toLocaleDateString()}
+                            {formatDate(invoice.dueDate, tz)}
                           </td>
 
                           <td className="px-4 py-4">

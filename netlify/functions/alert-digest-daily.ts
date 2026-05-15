@@ -3,6 +3,7 @@ import { prisma } from '../../src/lib/db/prisma';
 import { buildAlertDigest, type DigestAlert } from '../../src/lib/notifications/digest';
 import { queueEmailNotification, processOutboundNotifications } from '../../src/lib/notifications/outbox';
 import { resolvePreference } from '../../src/lib/notifications/preferences';
+import { getPlatformSettings } from '../../src/lib/settings/platform';
 
 export const config = {
   // Daily at 07:00 UTC. Cayman is UTC-5 → roughly 02:00 local; tune later.
@@ -13,10 +14,11 @@ export default async function alertDigestDaily() {
   try {
     const landlords = await prisma.landlordProfile.findMany({
       where: { status: RecordStatus.ACTIVE },
-      select: { id: true, displayName: true },
+      select: { id: true, displayName: true, timezone: true },
     });
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? undefined;
+    const platform = await getPlatformSettings();
 
     let workspacesProcessed = 0;
     let recipientsConsidered = 0;
@@ -88,6 +90,7 @@ export default async function alertDigestDaily() {
           alerts: digestAlerts,
           preference,
           appUrl,
+          timezone: landlord.timezone || platform.timezone,
         });
 
         if (digest.alertCount === 0) continue;

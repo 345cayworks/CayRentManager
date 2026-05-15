@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { SubscriptionStatus, UserStatus } from '@prisma/client';
+import { formatDate } from '@/lib/time/format';
 
 type SubscriptionSummary = {
   status: SubscriptionStatus;
@@ -169,7 +170,13 @@ function ModalShell({
   );
 }
 
-export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[] }) {
+export function LandlordControlCenter({
+  landlords,
+  timezone = 'America/Cayman',
+}: {
+  landlords: LandlordUser[];
+  timezone?: string;
+}) {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -428,13 +435,13 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
                 const periodHint = subscription
                   ? subscription.isComplimentary
                     ? subscription.complimentaryUntil
-                      ? `Until ${new Date(subscription.complimentaryUntil).toLocaleDateString()}`
+                      ? `Until ${formatDate(subscription.complimentaryUntil, timezone)}`
                       : 'No expiry'
                     : subscription.status === SubscriptionStatus.TRIAL && subscription.trialEndsAt
-                      ? `Trial ends ${formatRelativeDays(subscription.trialEndsAt) ?? new Date(subscription.trialEndsAt).toLocaleDateString()}`
+                      ? `Trial ends ${formatRelativeDays(subscription.trialEndsAt) ?? formatDate(subscription.trialEndsAt, timezone)}`
                       : subscription.status === SubscriptionStatus.GRACE_PERIOD && subscription.gracePeriodEndsAt
-                        ? `Grace ends ${formatRelativeDays(subscription.gracePeriodEndsAt) ?? new Date(subscription.gracePeriodEndsAt).toLocaleDateString()}`
-                        : `Renews ${formatRelativeDays(subscription.currentPeriodEnd) ?? new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+                        ? `Grace ends ${formatRelativeDays(subscription.gracePeriodEndsAt) ?? formatDate(subscription.gracePeriodEndsAt, timezone)}`
+                        : `Renews ${formatRelativeDays(subscription.currentPeriodEnd) ?? formatDate(subscription.currentPeriodEnd, timezone)}`
                   : null;
                 return (
                   <tr key={landlord.id} className="hover:bg-slate-50/70">
@@ -479,9 +486,9 @@ export function LandlordControlCenter({ landlords }: { landlords: LandlordUser[]
                       )}
                     </td>
                     <td className="px-4 py-3 align-top text-xs text-slate-500">
-                      <div>Last login: {landlord.lastLoginAt ? new Date(landlord.lastLoginAt).toLocaleDateString() : '—'}</div>
-                      <div>Last activity: {lastActivityAt ? new Date(lastActivityAt).toLocaleDateString() : '—'}</div>
-                      <div>Created: {new Date(landlord.createdAt).toLocaleDateString()}</div>
+                      <div>Last login: {formatDate(landlord.lastLoginAt, timezone)}</div>
+                      <div>Last activity: {formatDate(lastActivityAt, timezone)}</div>
+                      <div>Created: {formatDate(landlord.createdAt, timezone)}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex justify-end gap-1.5">

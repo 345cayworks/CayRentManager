@@ -2,12 +2,14 @@ import { Shell } from '@/components/shell';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { LandlordControlCenter } from '@/components/superadmin-landlord-control-center';
+import { getEffectiveTimezone } from '@/lib/time/effective';
 import { SubscriptionInvoiceStatus, UserRole } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   await requireSuperadmin();
+  const tz = await getEffectiveTimezone();
 
   const landlords = await prisma.user.findMany({
     where: { role: UserRole.LANDLORD },
@@ -102,7 +104,7 @@ export default async function Page() {
 
   return (
     <Shell title="Superadmin Landlords">
-      <LandlordControlCenter landlords={landlordData} />
+      <LandlordControlCenter landlords={landlordData} timezone={tz} />
     </Shell>
   );
 }

@@ -4,6 +4,7 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { getLandlordDashboardMetrics } from '@/lib/finance/dashboard';
 import { getOnboardingState } from '@/lib/onboarding/state';
+import { getEffectiveTimezone } from '@/lib/time/effective';
 import { SubscriptionStatus } from '@prisma/client';
 import Link from 'next/link';
 import { prisma } from '@/lib/db/prisma';
@@ -13,8 +14,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const { membership } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
   const [metrics, onboardingState] = await Promise.all([
-    getLandlordDashboardMetrics(membership.landlordId),
+    getLandlordDashboardMetrics(membership.landlordId, tz),
     getOnboardingState(membership.landlordId).catch(() => null),
   ]);
   let subscription: any = null;

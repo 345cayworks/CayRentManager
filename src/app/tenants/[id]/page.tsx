@@ -5,6 +5,8 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { deactivateTenantAction, updateTenantAction } from '@/server/actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,7 @@ export default async function Page({
   searchParams?: { edit?: string; updated?: string };
 }) {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
   const editOpen = searchParams?.edit === '1';
   const justUpdated = searchParams?.updated === '1';
 
@@ -154,7 +157,7 @@ export default async function Page({
                   Lease {activeLease.id}
                 </Link>
                 <p>{activeLease.property.name} / {activeLease.unit.unitName}</p>
-                <p>{activeLease.startDate.toLocaleDateString()} — {activeLease.endDate.toLocaleDateString()}</p>
+                <p>{formatDate(activeLease.startDate, tz)} — {formatDate(activeLease.endDate, tz)}</p>
               </div>
             )}
           </section>
@@ -197,8 +200,8 @@ export default async function Page({
                   <tbody className="divide-y">
                     {tenant.payments.map((payment) => (
                       <tr key={payment.id}>
-                        <td className="p-2">{payment.dueDate.toLocaleDateString()}</td>
-                        <td className="p-2">{payment.paymentDate?.toLocaleDateString() ?? '—'}</td>
+                        <td className="p-2">{formatDate(payment.dueDate, tz)}</td>
+                        <td className="p-2">{formatDate(payment.paymentDate, tz)}</td>
                         <td className="p-2 text-right">${Number(payment.amountDue).toFixed(2)}</td>
                         <td className="p-2 text-right">${Number(payment.amountPaid ?? 0).toFixed(2)}</td>
                         <td className="p-2 text-right">${Number(payment.balance).toFixed(2)}</td>

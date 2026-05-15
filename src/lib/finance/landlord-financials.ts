@@ -149,7 +149,8 @@ export function calculateOccupancyRate(properties: PropertyWithUnitsAndLeases[])
  */
 export function getMonthlyMetrics(
   payments: Payment[],
-  expenses: Expense[]
+  expenses: Expense[],
+  timezone: string = 'America/Cayman'
 ): MonthlyMetrics[] {
   const now = new Date();
   const metrics: MonthlyMetrics[] = [];
@@ -170,7 +171,11 @@ export function getMonthlyMetrics(
     const netCashflow = rentCollected - expensesTotal;
 
     metrics.push({
-      month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      month: new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        year: 'numeric',
+        timeZone: timezone,
+      }).format(monthStart),
       rentCollected,
       expenses: expensesTotal,
       netCashflow,
@@ -241,7 +246,8 @@ export function calculatePropertyCashflow(
 export function getRecentCashflowSeries(
   payments: Payment[],
   expenses: Expense[],
-  months = 6
+  months = 6,
+  timezone: string = 'America/Cayman'
 ): CashflowPoint[] {
   const series: CashflowPoint[] = [];
 
@@ -269,7 +275,10 @@ export function getRecentCashflowSeries(
       .reduce((sum, e) => sum + Number(e.amount), 0);
 
     series.push({
-      label: start.toLocaleDateString('en-US', { month: 'short' }),
+      label: new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        timeZone: timezone,
+      }).format(start),
       rentCollected,
       expenses: expensesTotal,
       net: rentCollected - expensesTotal,

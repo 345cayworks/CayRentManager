@@ -14,6 +14,8 @@ import {
   updateWorkOrderStatusAction,
 } from '@/server/actions';
 import { formatSlaCountdown, getSlaStatus, type SlaStatus } from '@/lib/maintenance/sla';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate, formatDateTime } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +54,7 @@ function formatMoney(value: unknown) {
 
 export default async function Page({ params }: { params: { maintenanceId: string } }) {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const [request, vendors] = await Promise.all([
     prisma.maintenanceRequest.findFirst({
@@ -97,15 +100,15 @@ export default async function Page({ params }: { params: { maintenanceId: string
               <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Permission to enter:</span> {request.permissionToEnter ? 'Yes' : 'No'}</div>
               <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Preferred contact:</span> {request.preferredContactTime ?? 'Not provided'}</div>
               <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Vendor:</span> {request.vendor?.name ?? 'Not assigned'}</div>
-              <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Created:</span> {request.createdAt.toLocaleDateString()}</div>
+              <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Created:</span> {formatDate(request.createdAt, tz)}</div>
               {request.slaDueAt ? (
-                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">SLA due:</span> {request.slaDueAt.toLocaleString()}</div>
+                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">SLA due:</span> {formatDateTime(request.slaDueAt, tz)}</div>
               ) : null}
               {request.firstResponseAt ? (
-                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">First response:</span> {request.firstResponseAt.toLocaleString()}</div>
+                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">First response:</span> {formatDateTime(request.firstResponseAt, tz)}</div>
               ) : null}
               {request.resolvedAt ? (
-                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Resolved:</span> {request.resolvedAt.toLocaleString()}</div>
+                <div className="rounded-lg bg-slate-50 p-3"><span className="font-medium">Resolved:</span> {formatDateTime(request.resolvedAt, tz)}</div>
               ) : null}
             </div>
           </article>
@@ -118,7 +121,7 @@ export default async function Page({ params }: { params: { maintenanceId: string
                 <div key={comment.id} className="rounded-xl border bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
                     <span>{comment.author.name ?? comment.author.email}</span>
-                    <span>{comment.createdAt.toLocaleString()}</span>
+                    <span>{formatDateTime(comment.createdAt, tz)}</span>
                   </div>
                   <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{comment.message}</p>
                 </div>
@@ -139,7 +142,7 @@ export default async function Page({ params }: { params: { maintenanceId: string
                 <a key={attachment.id} href={attachment.fileUrl} target="_blank" rel="noreferrer" className="rounded-xl border bg-slate-50 p-4 text-sm hover:bg-slate-100">
                   <p className="font-medium">{attachment.fileType || 'Attachment'}</p>
                   <p className="mt-1 truncate text-slate-500">{attachment.fileUrl}</p>
-                  <p className="mt-2 text-xs text-slate-400">Uploaded {attachment.uploadedAt.toLocaleDateString()}</p>
+                  <p className="mt-2 text-xs text-slate-400">Uploaded {formatDate(attachment.uploadedAt, tz)}</p>
                 </a>
               ))}
             </div>
@@ -161,15 +164,15 @@ export default async function Page({ params }: { params: { maintenanceId: string
                   <div className="grid gap-2 md:grid-cols-2">
                     <p>Estimated cost: {formatMoney(order.estimatedCost)}</p>
                     <p>Actual cost: {formatMoney(order.actualCost)}</p>
-                    <p>Scheduled: {order.scheduledDate ? order.scheduledDate.toLocaleDateString() : 'Not scheduled'}</p>
-                    <p>Dispatched: {order.dispatchedAt ? order.dispatchedAt.toLocaleString() : '—'}</p>
-                    <p>Started: {order.startedAt ? order.startedAt.toLocaleString() : '—'}</p>
-                    <p>Completed: {order.completedAt ? order.completedAt.toLocaleString() : '—'}</p>
+                    <p>Scheduled: {order.scheduledDate ? formatDate(order.scheduledDate, tz) : 'Not scheduled'}</p>
+                    <p>Dispatched: {formatDateTime(order.dispatchedAt, tz)}</p>
+                    <p>Started: {formatDateTime(order.startedAt, tz)}</p>
+                    <p>Completed: {formatDateTime(order.completedAt, tz)}</p>
                     {order.vendorAcknowledgedAt ? (
-                      <p>Vendor acknowledged: {order.vendorAcknowledgedAt.toLocaleString()}</p>
+                      <p>Vendor acknowledged: {formatDateTime(order.vendorAcknowledgedAt, tz)}</p>
                     ) : null}
                     {order.cancelledAt ? (
-                      <p>Cancelled: {order.cancelledAt.toLocaleString()}{order.cancelReason ? ` · ${order.cancelReason}` : ''}</p>
+                      <p>Cancelled: {formatDateTime(order.cancelledAt, tz)}{order.cancelReason ? ` · ${order.cancelReason}` : ''}</p>
                     ) : null}
                   </div>
                   {order.notes ? <p className="whitespace-pre-line">{order.notes}</p> : null}

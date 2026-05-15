@@ -11,6 +11,8 @@ import {
   createLeaseNoticeAction,
   createLeaseRenewalAction,
 } from '@/server/lease-lifecycle-actions';
+import { getEffectiveTimezone } from '@/lib/time/effective';
+import { formatDate } from '@/lib/time/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +44,7 @@ function badge(value: string, tone = 'slate') {
 
 export default async function Page({ params }: { params: { id: string } }) {
   const { landlordId } = await getCurrentLandlordWorkspace();
+  const tz = await getEffectiveTimezone();
 
   const lease = await prisma.lease.findFirst({
     where: { id: params.id, landlordId },
@@ -109,7 +112,7 @@ export default async function Page({ params }: { params: { id: string } }) {
         </div>
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Lease Ends</p>
-          <p className="mt-2 text-lg font-semibold">{lease.endDate.toLocaleDateString()}</p>
+          <p className="mt-2 text-lg font-semibold">{formatDate(lease.endDate, tz)}</p>
         </div>
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Lifecycle Events</p>
@@ -140,11 +143,11 @@ export default async function Page({ params }: { params: { id: string } }) {
               </div>
               <div>
                 <p className="text-slate-500">Start date</p>
-                <p>{lease.startDate.toLocaleDateString()}</p>
+                <p>{formatDate(lease.startDate, tz)}</p>
               </div>
               <div>
                 <p className="text-slate-500">End date</p>
-                <p>{lease.endDate.toLocaleDateString()}</p>
+                <p>{formatDate(lease.endDate, tz)}</p>
               </div>
               <div>
                 <p className="text-slate-500">Late fee amount</p>
@@ -182,8 +185,8 @@ export default async function Page({ params }: { params: { id: string } }) {
                   <tbody className="divide-y">
                     {lease.payments.map((payment) => (
                       <tr key={payment.id}>
-                        <td className="p-2">{payment.dueDate.toLocaleDateString()}</td>
-                        <td className="p-2">{payment.paymentDate?.toLocaleDateString() ?? '—'}</td>
+                        <td className="p-2">{formatDate(payment.dueDate, tz)}</td>
+                        <td className="p-2">{formatDate(payment.paymentDate, tz)}</td>
                         <td className="p-2 text-right">{money(payment.amountDue)}</td>
                         <td className="p-2 text-right">{money(payment.amountPaid ?? 0)}</td>
                         <td className="p-2 text-right">{money(payment.balance)}</td>
@@ -204,7 +207,7 @@ export default async function Page({ params }: { params: { id: string } }) {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-slate-900">{event.eventType.replaceAll('_', ' ')}</p>
-                      <p className="mt-1 text-sm text-slate-500">{event.eventDate.toLocaleDateString()}</p>
+                      <p className="mt-1 text-sm text-slate-500">{formatDate(event.eventDate, tz)}</p>
                     </div>
                     {event.completedAt ? badge('Completed', 'emerald') : badge('Pending', 'amber')}
                   </div>
@@ -221,7 +224,7 @@ export default async function Page({ params }: { params: { id: string } }) {
                 <div key={renewal.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-slate-900">{renewal.renewalStartDate.toLocaleDateString()} → {renewal.renewalEndDate.toLocaleDateString()}</p>
+                      <p className="font-medium text-slate-900">{formatDate(renewal.renewalStartDate, tz)} → {formatDate(renewal.renewalEndDate, tz)}</p>
                       <p className="mt-1 text-sm text-slate-500">Proposed Rent: {money(renewal.proposedRentAmount)}</p>
                     </div>
                     {badge(renewal.status, renewal.status === 'COMPLETED' ? 'emerald' : 'cyan')}
@@ -240,7 +243,7 @@ export default async function Page({ params }: { params: { id: string } }) {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-slate-900">{notice.noticeType.replaceAll('_', ' ')}</p>
-                      <p className="mt-1 text-sm text-slate-500">{notice.noticeDate.toLocaleDateString()}</p>
+                      <p className="mt-1 text-sm text-slate-500">{formatDate(notice.noticeDate, tz)}</p>
                     </div>
                     {notice.sentAt ? badge('Sent', 'emerald') : badge('Draft', 'amber')}
                   </div>

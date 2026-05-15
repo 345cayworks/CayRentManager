@@ -206,7 +206,7 @@ Remaining:
 Status:
 
 ```text
-Strong foundation complete
+Complete
 ```
 
 Implemented:
@@ -225,6 +225,10 @@ Implemented:
 - alert center UI
 - review/dismiss workflow
 - alert dashboard integration
+- alert badges in landlord navigation
+- per-user alert preferences at `/account/notifications` (digest on/off, minimum severity, suppressed types)
+- daily digest scheduled function (`alert-digest-daily.ts`)
+- notification outbox + log-only default driver + Resend driver behind env
 
 Alert lifecycle:
 
@@ -232,20 +236,16 @@ Alert lifecycle:
 ACTIVE → REVIEWED → RESOLVED / DISMISSED
 ```
 
-Current strategic value:
+Notification outbox lifecycle:
 
 ```text
-CayRentManager now has operational intelligence, not just record tracking.
+PENDING → SENT / FAILED / SKIPPED
 ```
 
-Remaining:
+Deferred to later phases:
 
-- email/SMS notification layer
-- alert badges in navigation
-- daily digest
-- escalation routing
-- concierge assignment
-- alert preferences
+- escalation routing (needs a rules engine + team-member resolution)
+- concierge assignment (blocked on the concierge role rollout in Phase 5+)
 
 ---
 

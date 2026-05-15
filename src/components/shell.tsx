@@ -1,65 +1,124 @@
 import Link from 'next/link';
-import { UserRole } from '@prisma/client';
-import { getActiveUser } from '@/lib/auth/guards';
+import { LeaseAlertSnapshotStatus, RecordStatus, UserRole } from '@prisma/client';
+import { getActiveUser, getUserLandlordMemberships } from '@/lib/auth/guards';
+import { getActiveLandlordWorkspace } from '@/lib/auth/workspace';
+import { prisma } from '@/lib/db/prisma';
 import { SignOutPanel } from '@/components/sign-out-panel';
 
-const adminLinks = [
-  ['/admin', 'Dashboard'],
-  ['/admin/analytics', 'Analytics'],
-  ['/admin/users', 'Users'],
-  ['/admin/landlords', 'Landlords'],
-  ['/admin/billing', 'Billing'],
-  ['/admin/audit', 'Audit'],
-  ['/admin/safety', 'Safety'],
-  ['/account/profile', 'Profile'],
+type NavLink = { href: string; label: string; badge?: number };
+
+const adminLinks: NavLink[] = [
+  { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/analytics', label: 'Analytics' },
+  { href: '/admin/users', label: 'Users' },
+  { href: '/admin/landlords', label: 'Landlords' },
+  { href: '/admin/billing', label: 'Billing' },
+  { href: '/admin/audit', label: 'Audit' },
+  { href: '/admin/safety', label: 'Safety' },
+  { href: '/account/profile', label: 'Profile' },
 ];
 
-const landlordLinks = [
-  ['/dashboard', 'Dashboard'],
-  ['/onboarding', 'Onboarding'],
-  ['/alerts', 'Alerts'],
-  ['/properties', 'Properties'],
-  ['/units', 'Units'],
-  ['/tenants', 'Tenants'],
-  ['/leases', 'Leases'],
-  ['/payments', 'Rent Payments'],
-  ['/payments/settings', 'Rent Payment Settings'],
-  ['/account/billing', 'Account Billing'],
-  ['/account/profile', 'Profile'],
-  ['/maintenance', 'Maintenance'],
-  ['/expenses', 'Expenses'],
-  ['/documents', 'Documents'],
-  ['/reports', 'Reports'],
+const baseLandlordLinks: NavLink[] = [
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/onboarding', label: 'Onboarding' },
+  { href: '/alerts', label: 'Alerts' },
+  { href: '/properties', label: 'Properties' },
+  { href: '/units', label: 'Units' },
+  { href: '/tenants', label: 'Tenants' },
+  { href: '/leases', label: 'Leases' },
+  { href: '/payments', label: 'Rent Payments' },
+  { href: '/payments/settings', label: 'Rent Payment Settings' },
+  { href: '/account/billing', label: 'Account Billing' },
+  { href: '/account/profile', label: 'Profile' },
+  { href: '/maintenance', label: 'Maintenance' },
+  { href: '/expenses', label: 'Expenses' },
+  { href: '/documents', label: 'Documents' },
+  { href: '/reports', label: 'Reports' },
 ];
 
-const tenantLinks = [
-  ['/tenant/dashboard', 'Dashboard'],
-  ['/tenant/maintenance', 'Maintenance'],
-  ['/account/profile', 'Profile'],
+const tenantLinks: NavLink[] = [
+  { href: '/tenant/dashboard', label: 'Dashboard' },
+  { href: '/tenant/maintenance', label: 'Maintenance' },
+  { href: '/account/profile', label: 'Profile' },
 ];
 
-const operationalLinks = [['/unauthorized', 'Access Pending']];
+const operationalLinks: NavLink[] = [{ href: '/unauthorized', label: 'Access Pending' }];
 
-function linksForRole(role?: UserRole) {
+const LANDLORD_ROLES: ReadonlySet<UserRole> = new Set([
+  UserRole.LANDLORD,
+  UserRole.PROPERTY_MANAGER,
+  UserRole.ACCOUNTANT,
+]);
+
+const OPERATIONAL_ROLES: ReadonlySet<UserRole> = new Set([
+  UserRole.VENDOR,
+  UserRole.MAINTENANCE_PROVIDER,
+  UserRole.CONCIERGE_AGENT,
+  UserRole.GUEST,
+]);
+
+async function landlordLinksWithAlertBadge(userId: string): Promise<NavLink[]> {
+  const memberships = await getUserLandlordMemberships(userId);
+  const landlordId = getActiveLandlordWorkspace(memberships.map((m) => m.landlordId));
+  if (!landlordId) return baseLandlordLinks;
+
+  let activeAlertCount = 0;
+  try {
+    activeAlertCount = await prisma.leaseAlertSnapshot.count({
+      where: { landlordId, status: LeaseAlertSnapshotStatus.ACTIVE },
+    });
+  } catch {
+    // Alerts table missing or unreachable → render nav without the badge.
+    return baseLandlordLinks;
+  }
+
+  if (activeAlertCount === 0) return baseLandlordLinks;
+
+  return baseLandlordLinks.map((link) =>
+    link.href === '/alerts' ? { ...link, badge: activeAlertCount } : link,
+  );
+}
+
+async function linksForRole(role: UserRole | undefined, userId: string | undefined): Promise<NavLink[]> {
+  if (!role) return [];
   if (role === UserRole.SUPERADMIN) return adminLinks;
   if (role === UserRole.TENANT) return tenantLinks;
-  if (role === UserRole.LANDLORD || role === UserRole.PROPERTY_MANAGER || role === UserRole.ACCOUNTANT) return landlordLinks;
-  if (role === UserRole.VENDOR || role === UserRole.MAINTENANCE_PROVIDER || role === UserRole.CONCIERGE_AGENT || role === UserRole.GUEST) return operationalLinks;
+  if (LANDLORD_ROLES.has(role)) {
+    if (!userId) return baseLandlordLinks;
+    return landlordLinksWithAlertBadge(userId);
+  }
+  if (OPERATIONAL_ROLES.has(role)) return operationalLinks;
   return [];
+}
+
+function Badge({ count }: { count: number }) {
+  return (
+    <span
+      className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+      aria-label={`${count} active alerts`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
 }
 
 export async function Shell({ title, children }: { title: string; children?: React.ReactNode }) {
   const user = await getActiveUser();
-  const links = linksForRole(user?.role);
+  const links = await linksForRole(user?.role, user?.userId);
 
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr]">
       <aside className="bg-brand-navy text-white p-4 flex flex-col">
         <h1 className="text-lg font-semibold mb-4">CayRentManager</h1>
         <nav className="space-y-2">
-          {links.map(([href, label]) => (
-            <Link key={href} className="block text-sm hover:underline" href={href}>
-              {label}
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              className="flex items-center justify-between text-sm hover:underline"
+              href={link.href}
+            >
+              <span>{link.label}</span>
+              {link.badge ? <Badge count={link.badge} /> : null}
             </Link>
           ))}
         </nav>

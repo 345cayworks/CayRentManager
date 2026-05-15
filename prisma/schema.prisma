@@ -197,6 +197,8 @@ model User {
   sentMessages     Message[] @relation("Sender")
   receivedMessages Message[] @relation("Receiver")
   auditActions     AuditLog[] @relation("AuditActor")
+  alertPreferences AlertPreference[]
+  outboundNotifications OutboundNotification[]
 }
 
 model AppSession {
@@ -277,6 +279,8 @@ model LandlordProfile {
   leaseAlertSnapshots LeaseAlertSnapshot[]
   subscriptions       LandlordSubscription[]
   subscriptionInvoices SubscriptionInvoice[]
+  alertPreferences    AlertPreference[]
+  outboundNotifications OutboundNotification[]
 }
 
 model SubscriptionPlan {
@@ -906,4 +910,59 @@ model AuditLog {
 
   landlord LandlordProfile? @relation(fields: [landlordId], references: [id])
   actor    User             @relation("AuditActor", fields: [actorUserId], references: [id])
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+}
+
+model AlertPreference {
+  id              String   @id @default(cuid())
+  landlordId      String
+  userId          String
+  digestEnabled   Boolean  @default(true)
+  minSeverity     String   @default("WARNING")
+  suppressedTypes String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+  user     User            @relation(fields: [userId], references: [id])
+
+  @@unique([landlordId, userId])
+  @@index([landlordId])
+}
+
+model OutboundNotification {
+  id                String              @id @default(cuid())
+  landlordId        String?
+  recipientUserId   String?
+  recipientEmail    String
+  channel           NotificationChannel @default(EMAIL)
+  subject           String
+  body              String              @db.Text
+  bodyHtml          String?             @db.Text
+  relatedAlertKeys  String[]            @default([])
+  status            NotificationStatus  @default(PENDING)
+  provider          String?
+  providerMessageId String?
+  failureReason     String?
+  attemptCount      Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  sentAt            DateTime?
+
+  landlord  LandlordProfile? @relation(fields: [landlordId], references: [id])
+  recipient User?            @relation(fields: [recipientUserId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([landlordId, createdAt])
 }

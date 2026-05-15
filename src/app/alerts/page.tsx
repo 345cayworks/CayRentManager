@@ -224,6 +224,17 @@ export default async function AlertsPage() {
               </div>
             </div>
           </div>
+          <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-slate-300">
+            <Link
+              href="/account/notifications"
+              className="rounded-full border border-white/20 px-3 py-1 transition hover:bg-white/10"
+            >
+              Notification preferences
+            </Link>
+            <span className="text-slate-400">
+              Daily digest summarises active alerts at your minimum severity.
+            </span>
+          </div>
         </section>
 
         <AlertsSection title="Active Alerts" status="ACTIVE" />

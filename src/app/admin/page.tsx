@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   await requireSuperadmin();
-  const [users, landlords, disabledUsers] = await Promise.all([
+  const [users, landlords, disabledUsers, auditEntries] = await Promise.all([
     prisma.user.count(),
     prisma.landlordProfile.count(),
     prisma.user.count({ where: { status: UserStatus.DISABLED } }),
+    prisma.auditLog.count(),
   ]);
 
   const actions = [
@@ -30,10 +31,23 @@ export default async function Page() {
       icon: '🏢',
     },
     {
+      href: '/admin/analytics',
+      title: 'Platform Analytics',
+      description: 'Growth, role distribution, top workspaces, and financial KPIs.',
+      icon: '📈',
+    },
+    {
       href: '/admin/audit',
       title: 'Audit Logs',
-      description: 'Recent platform activity and admin actions.',
+      description: 'Filterable activity timeline by actor, action, and entity.',
+      badge: auditEntries,
       icon: '📋',
+    },
+    {
+      href: '/admin/safety',
+      title: 'Safety Review',
+      description: 'Live audit of platform guardrails and bootstrap policy state.',
+      icon: '🛡️',
     },
     {
       href: '/admin/billing',

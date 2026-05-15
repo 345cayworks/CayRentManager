@@ -5,10 +5,12 @@ import { SignOutPanel } from '@/components/sign-out-panel';
 
 const adminLinks = [
   ['/admin', 'Dashboard'],
+  ['/admin/analytics', 'Analytics'],
   ['/admin/users', 'Users'],
   ['/admin/landlords', 'Landlords'],
   ['/admin/billing', 'Billing'],
   ['/admin/audit', 'Audit'],
+  ['/admin/safety', 'Safety'],
   ['/account/profile', 'Profile'],
 ];
 

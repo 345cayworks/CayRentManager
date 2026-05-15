@@ -139,10 +139,10 @@ Ongoing operational requirement:
 Status:
 
 ```text
-Partially complete / usable foundation
+Complete
 ```
 
-Implemented or started:
+Implemented:
 
 - superadmin role
 - admin dashboard area
@@ -151,15 +151,15 @@ Implemented or started:
 - audit log structure
 - reset/temporary-password work from previous sprint
 - user account status controls
+- platform analytics at `/admin/analytics` (growth, role distribution, top workspaces, financial KPIs)
+- richer audit views at `/admin/audit` (filterable by actor, action, entity, paginated)
+- admin safety review at `/admin/safety` (live audit of guardrails and bootstrap policy state)
+- platform billing/plan management at `/admin/billing`
 
-Remaining high-value work:
+Deferred to later phases:
 
-- global vendor management
-- admin analytics
-- user impersonation is not recommended yet
-- richer audit views
-- admin safety constraints review
-- billing/plan management later
+- global vendor management (moved to Phase 5.1)
+- user impersonation (intentionally not built — privacy/security boundary)
 
 ---
 
@@ -784,6 +784,7 @@ Build:
 - Confirm `/dashboard` has only one route source.
 - Confirm `/onboarding` does not import missing dependencies.
 - Confirm `/alerts` renders inside the sidebar shell.
+- Confirm `/admin/analytics`, `/admin/audit`, and `/admin/safety` render for superadmins.
 
 ## High Priority
 

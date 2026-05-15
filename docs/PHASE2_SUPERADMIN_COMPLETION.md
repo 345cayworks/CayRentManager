@@ -44,7 +44,20 @@ The Phase 2 Superadmin track previously listed five remaining items in `DEVELOPM
 
 ```text
 /admin/audit
+/admin/landlords (subscription + activity surfacing)
 ```
+
+### Subscription Surfacing on /admin/landlords
+
+The landlord control center now shows, per workspace:
+
+- Plan name, amount, billing interval
+- Subscription status pill (Active, Trial, Complimentary, Past due, Grace period, Cancelled, Inactive, Manual)
+- Period hint (renews / trial ends / grace ends / complimentary until)
+- Outstanding platform billing balance (sum of OPEN + OVERDUE + PENDING_VERIFICATION SubscriptionInvoices)
+- Last platform activity (most recent AuditLog entry for the workspace)
+
+New subscription filter on the table: Active (paid), Trial, Complimentary, Past due, Grace period, Cancelled, Has outstanding balance, No subscription. Header KPI cards expanded to Active / Paying / Complimentary / Past due / Pending / Outstanding (KYD).
 
 ### Navigation
 

@@ -94,6 +94,7 @@ export async function POST(request: Request) {
         const trialDays = Math.max(0, Number(body?.trialDays ?? 0));
         const complimentaryReason = body?.complimentaryReason ? String(body.complimentaryReason).trim() : null;
         const complimentaryUntil = body?.complimentaryUntil ? new Date(String(body.complimentaryUntil)) : null;
+        const requestedPlanId = body?.planId ? String(body.planId).trim() : null;
 
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -106,14 +107,18 @@ export async function POST(request: Request) {
           throw new Error('Landlord workspace not found for user.');
         }
 
-        const plan = await prisma.subscriptionPlan.findFirst({
-          where: { status: 'ACTIVE' },
-          orderBy: { createdAt: 'asc' },
-        });
+        const plan = requestedPlanId
+          ? await prisma.subscriptionPlan.findFirst({ where: { id: requestedPlanId, status: 'ACTIVE' } })
+          : await prisma.subscriptionPlan.findFirst({
+              where: { status: 'ACTIVE' },
+              orderBy: { createdAt: 'asc' },
+            });
 
         if (!plan) {
           throw new Error(
-            'Create at least one subscription plan before assigning access.'
+            requestedPlanId
+              ? 'Selected plan is not active or does not exist.'
+              : 'Create at least one subscription plan before assigning access.'
           );
         }
 

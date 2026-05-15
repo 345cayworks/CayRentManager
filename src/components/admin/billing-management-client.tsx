@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import {
+  changeSubscriptionPlanAction,
   convertToPaidAction,
   createSubscriptionInvoiceAction,
   extendComplimentaryAction,
@@ -15,6 +16,7 @@ import {
 
 type BillingRow = {
   subscriptionId: string;
+  planId: string;
   landlordName: string;
   planName: string;
   amountLabel: string;
@@ -30,6 +32,15 @@ type BillingRow = {
   complimentary: boolean;
 };
 
+type PlanOption = {
+  id: string;
+  code: string;
+  name: string;
+  amount: number;
+  currency: string;
+  intervalMonths: number;
+};
+
 type ModalType =
   | 'createInvoice'
   | 'regenerateLink'
@@ -39,10 +50,12 @@ type ModalType =
   | 'makeComplimentary'
   | 'extendComplimentary'
   | 'convertToPaid'
+  | 'changePlan'
   | null;
 
 interface BillingManagementClientProps {
   rows: BillingRow[];
+  plans: PlanOption[];
   activeSubscribers: number;
   complimentaryCount: number;
   monthlyRevenue: number;
@@ -120,15 +133,20 @@ function ModalShell({
 function ActionModal({
   row,
   modalType,
+  plans,
   onClose,
 }: {
   row: BillingRow;
   modalType: ModalType;
+  plans: PlanOption[];
   onClose: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState('');
   const [until, setUntil] = useState('');
+  const [planId, setPlanId] = useState(row.planId);
+  const [effectiveAt, setEffectiveAt] = useState<'NEXT_CYCLE' | 'IMMEDIATE'>('NEXT_CYCLE');
+  const [note, setNote] = useState('');
 
   async function handleFormSubmit(
     action: (formData: FormData) => Promise<void>,
@@ -408,11 +426,119 @@ function ActionModal({
     );
   }
 
+  if (modalType === 'changePlan') {
+    const targetPlan = plans.find((plan) => plan.id === planId);
+    const sameAsCurrent = planId === row.planId;
+    return (
+      <ModalShell
+        title="Change Plan"
+        description="Switches the subscription to a different plan. Next-cycle keeps the current period; the new plan amount takes effect on the next invoice. Immediate starts a fresh period now and triggers an invoice for paid accounts (complimentary subs always defer to next cycle)."
+        onClose={onClose}
+      >
+        {plans.length === 0 ? (
+          <p className="text-sm text-slate-600">No active plans available. Create a plan in /admin/billing/plans first.</p>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleFormSubmit(changeSubscriptionPlanAction, (formData) => {
+                formData.set('subscriptionId', row.subscriptionId);
+                formData.set('planId', planId);
+                formData.set('effectiveAt', effectiveAt);
+                if (note) formData.set('note', note);
+              });
+            }}
+            className="space-y-4"
+          >
+            <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+              <p>Current plan: <span className="font-semibold text-slate-900">{row.planName}</span> · {row.amountLabel}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Target plan</label>
+              <select
+                value={planId}
+                onChange={(e) => setPlanId(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              >
+                {plans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name} — {plan.currency} {plan.amount.toFixed(2)} / {plan.intervalMonths === 1 ? 'mo' : `${plan.intervalMonths}mo`}
+                  </option>
+                ))}
+              </select>
+              {targetPlan ? (
+                <p className="mt-1 text-[11px] text-slate-500">{targetPlan.code}</p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Effective</label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-2 text-xs">
+                  <input
+                    type="radio"
+                    name="effectiveAt"
+                    value="NEXT_CYCLE"
+                    checked={effectiveAt === 'NEXT_CYCLE'}
+                    onChange={() => setEffectiveAt('NEXT_CYCLE')}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block font-medium text-slate-900">Next cycle</span>
+                    <span className="text-slate-500">Keep current period. New amount on next invoice.</span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-2 text-xs">
+                  <input
+                    type="radio"
+                    name="effectiveAt"
+                    value="IMMEDIATE"
+                    checked={effectiveAt === 'IMMEDIATE'}
+                    onChange={() => setEffectiveAt('IMMEDIATE')}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block font-medium text-slate-900">Immediate</span>
+                    <span className="text-slate-500">Reset period to now. Generates an invoice next cron run.</span>
+                  </span>
+                </label>
+              </div>
+              {row.complimentary && effectiveAt === 'IMMEDIATE' ? (
+                <p className="mt-1 text-[11px] text-amber-600">Complimentary subscriptions ignore Immediate — change still applies on next cycle.</p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Note (optional)</label>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Example: Customer requested downgrade after Q1 review"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={busy || sameAsCurrent}
+              className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {busy ? 'Switching plan...' : sameAsCurrent ? 'Pick a different plan' : 'Change plan'}
+            </button>
+          </form>
+        )}
+      </ModalShell>
+    );
+  }
+
   return null;
 }
 
 export function BillingManagementClient({
   rows,
+  plans,
   activeSubscribers,
   complimentaryCount,
   monthlyRevenue,
@@ -577,6 +703,14 @@ export function BillingManagementClient({
                           />
                         )}
 
+                        {/* Change Plan */}
+                        <IconActionButton
+                          title="Change Plan"
+                          icon="↔"
+                          tone="billing"
+                          onClick={() => openModal(row, 'changePlan')}
+                        />
+
                         {/* Extend Billing Period 30 Days */}
                         <IconActionButton
                           title="Extend Billing Period 30 Days"
@@ -626,7 +760,7 @@ export function BillingManagementClient({
 
       {/* Modal */}
       {activeModal && selectedRow && (
-        <ActionModal row={selectedRow} modalType={activeModal} onClose={closeModal} />
+        <ActionModal row={selectedRow} modalType={activeModal} plans={plans} onClose={closeModal} />
       )}
     </div>
   );

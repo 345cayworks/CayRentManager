@@ -91,6 +91,7 @@ The platform now has meaningful operational depth, but final production confiden
 
 Latest confirmed merged work includes:
 
+- Phase 3 sprint closeout (vendor management, dispatch workflow, SLA tracking, vendor portal)
 - Phase 4 alert center and alert automation foundation
 - document vault foundation
 - registration workflow tightening
@@ -168,7 +169,7 @@ Deferred to later phases:
 Status:
 
 ```text
-Implemented foundation
+Complete
 ```
 
 Implemented:
@@ -181,6 +182,10 @@ Implemented:
 - landlord maintenance vendor model
 - maintenance vendor assignment concept
 - vendor/work-order relations
+- richer vendor UI (edit, archive, restore, contact + licence + insurance)
+- vendor portal login (`/vendor/dashboard`, `/vendor/work-orders/[id]`)
+- work-order dispatch workflow with `WorkOrderStatus` enum and guarded transitions
+- maintenance SLA tracking (per-priority targets, due-by, breach badges)
 
 Current vendor model:
 
@@ -190,14 +195,10 @@ MaintenanceVendor is landlord-scoped through landlordId
 
 This means each landlord can maintain their own private vendor list.
 
-Remaining:
+Deferred to later phases:
 
-- richer vendor UI
-- vendor portal login
-- work-order dispatch workflow
-- maintenance SLA tracking
-- before/after photo uploads
-- vendor marketplace/global vendor layer
+- before/after photo uploads (Phase 7, blocked on `@netlify/blobs`)
+- vendor marketplace/global vendor layer (Phase 5.1)
 
 ---
 

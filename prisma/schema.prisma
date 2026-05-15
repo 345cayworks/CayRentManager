@@ -165,40 +165,49 @@ enum LeaseAlertSnapshotStatus {
   DISMISSED
 }
 
-model User {
-  id             String    @id @default(cuid())
-  netlifyUserId  String?   @unique
-  name           String?
-  email          String    @unique
-  emailVerified  DateTime?
-  image          String?
-  fullName       String?
-  phone          String?
-  role           UserRole   @default(LANDLORD)
-  status         UserStatus @default(ACTIVE)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  lastLoginAt             DateTime?
-  disabledAt              DateTime?
-  disabledBy              String?
-  disabledById            String?
-  disabledReason          String?
-  mustChangePassword      Boolean   @default(false)
-  temporaryPasswordHash   String?   @db.Text
-  temporaryPasswordSetAt  DateTime?
-  appSessions             AppSession[]
+enum WorkOrderStatus {
+  OPEN
+  DISPATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
 
-  accounts         Account[]
-  sessions         Session[]
-  ownedLandlords   LandlordProfile[] @relation("LandlordOwner")
-  memberships      LandlordMembership[]
-  tenantProfile    Tenant?
-  maintenanceComments MaintenanceComment[]
-  sentMessages     Message[] @relation("Sender")
-  receivedMessages Message[] @relation("Receiver")
-  auditActions     AuditLog[] @relation("AuditActor")
-  alertPreferences AlertPreference[]
-  outboundNotifications OutboundNotification[]
+model User {
+  id                     String       @id @default(cuid())
+  netlifyUserId          String?      @unique
+  name                   String?
+  email                  String       @unique
+  emailVerified          DateTime?
+  image                  String?
+  fullName               String?
+  phone                  String?
+  role                   UserRole     @default(LANDLORD)
+  status                 UserStatus   @default(ACTIVE)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  lastLoginAt            DateTime?
+  disabledAt             DateTime?
+  disabledBy             String?
+  disabledById           String?
+  disabledReason         String?
+  mustChangePassword     Boolean      @default(false)
+  temporaryPasswordHash  String?      @db.Text
+  temporaryPasswordSetAt DateTime?
+  appSessions            AppSession[]
+
+  accounts                 Account[]
+  sessions                 Session[]
+  ownedLandlords           LandlordProfile[]      @relation("LandlordOwner")
+  memberships              LandlordMembership[]
+  tenantProfile            Tenant?
+  maintenanceComments      MaintenanceComment[]
+  sentMessages             Message[]              @relation("Sender")
+  receivedMessages         Message[]              @relation("Receiver")
+  auditActions             AuditLog[]             @relation("AuditActor")
+  alertPreferences         AlertPreference[]
+  outboundNotifications    OutboundNotification[]
+  maintenanceVendorProfile MaintenanceVendor?
 }
 
 model AppSession {
@@ -259,87 +268,87 @@ model LandlordProfile {
   archivedAt  DateTime?
   archivedBy  String?
 
-  owner               User                 @relation("LandlordOwner", fields: [ownerUserId], references: [id])
-  memberships         LandlordMembership[]
-  properties          Property[]
-  units               Unit[]
-  tenants             Tenant[]
-  invitations         TenantInvitation[]
-  leases              Lease[]
-  payments            Payment[]
-  invoices            Invoice[]
-  paymentMethods      PaymentMethod[]
-  bankAccounts        BankAccount[]
-  expenses            Expense[]
-  maintenanceRequests MaintenanceRequest[]
-  maintenanceVendors  MaintenanceVendor[]
-  documents           Document[]
-  messages            Message[]
-  auditLogs           AuditLog[]
-  leaseAlertSnapshots LeaseAlertSnapshot[]
-  subscriptions       LandlordSubscription[]
-  subscriptionInvoices SubscriptionInvoice[]
-  alertPreferences    AlertPreference[]
+  owner                 User                   @relation("LandlordOwner", fields: [ownerUserId], references: [id])
+  memberships           LandlordMembership[]
+  properties            Property[]
+  units                 Unit[]
+  tenants               Tenant[]
+  invitations           TenantInvitation[]
+  leases                Lease[]
+  payments              Payment[]
+  invoices              Invoice[]
+  paymentMethods        PaymentMethod[]
+  bankAccounts          BankAccount[]
+  expenses              Expense[]
+  maintenanceRequests   MaintenanceRequest[]
+  maintenanceVendors    MaintenanceVendor[]
+  documents             Document[]
+  messages              Message[]
+  auditLogs             AuditLog[]
+  leaseAlertSnapshots   LeaseAlertSnapshot[]
+  subscriptions         LandlordSubscription[]
+  subscriptionInvoices  SubscriptionInvoice[]
+  alertPreferences      AlertPreference[]
   outboundNotifications OutboundNotification[]
 }
 
 model SubscriptionPlan {
-  id String @id @default(cuid())
-  code String @unique
-  name String
-  amount Decimal
-  currency String @default("KYD")
-  intervalMonths Int @default(1)
-  status RecordStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String       @id @default(cuid())
+  code           String       @unique
+  name           String
+  amount         Decimal
+  currency       String       @default("KYD")
+  intervalMonths Int          @default(1)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   subscriptions LandlordSubscription[]
 }
 
 model LandlordSubscription {
-  id String @id @default(cuid())
-  landlordId String @unique
-  planId String
-  status SubscriptionStatus @default(ACTIVE)
-  currentPeriodStart DateTime
-  currentPeriodEnd DateTime
-  nextInvoiceAt DateTime?
-  gracePeriodEndsAt DateTime?
-  isComplimentary Boolean @default(false)
-  complimentarySeats Int @default(0)
-  complimentaryReason String?
-  complimentaryUntil DateTime?
+  id                    String             @id @default(cuid())
+  landlordId            String             @unique
+  planId                String
+  status                SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  nextInvoiceAt         DateTime?
+  gracePeriodEndsAt     DateTime?
+  isComplimentary       Boolean            @default(false)
+  complimentarySeats    Int                @default(0)
+  complimentaryReason   String?
+  complimentaryUntil    DateTime?
   complimentaryByUserId String?
-  trialStartsAt DateTime?
-  trialEndsAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  trialStartsAt         DateTime?
+  trialEndsAt           DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
-  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+  landlord LandlordProfile       @relation(fields: [landlordId], references: [id])
+  plan     SubscriptionPlan      @relation(fields: [planId], references: [id])
   invoices SubscriptionInvoice[]
 }
 
 model SubscriptionInvoice {
-  id String @id @default(cuid())
-  subscriptionId String
-  landlordId String
-  invoiceNumber String @unique
-  amount Decimal
-  currency String @default("KYD")
-  status SubscriptionInvoiceStatus @default(OPEN)
-  dueDate DateTime
-  paidAt DateTime?
-  waivedAt DateTime?
-  fygaroCustomRef String? @unique
+  id               String                    @id @default(cuid())
+  subscriptionId   String
+  landlordId       String
+  invoiceNumber    String                    @unique
+  amount           Decimal
+  currency         String                    @default("KYD")
+  status           SubscriptionInvoiceStatus @default(OPEN)
+  dueDate          DateTime
+  paidAt           DateTime?
+  waivedAt         DateTime?
+  fygaroCustomRef  String?                   @unique
   fygaroPaymentUrl String?
-  fygaroPaymentId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  fygaroPaymentId  String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
 
-  subscription LandlordSubscription @relation(fields: [subscriptionId], references: [id])
-  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+  subscription  LandlordSubscription  @relation(fields: [subscriptionId], references: [id])
+  landlord      LandlordProfile       @relation(fields: [landlordId], references: [id])
   paymentEvents BillingPaymentEvent[]
 
   @@index([subscriptionId, status])
@@ -347,13 +356,13 @@ model SubscriptionInvoice {
 }
 
 model BillingPaymentEvent {
-  id String @id @default(cuid())
+  id                    String   @id @default(cuid())
   subscriptionInvoiceId String
-  eventType String
-  provider String @default("FYGARO")
-  providerReference String?
-  payload Json?
-  createdAt DateTime @default(now())
+  eventType             String
+  provider              String   @default("FYGARO")
+  providerReference     String?
+  payload               Json?
+  createdAt             DateTime @default(now())
 
   invoice SubscriptionInvoice @relation(fields: [subscriptionInvoiceId], references: [id], onDelete: Cascade)
 
@@ -392,7 +401,7 @@ model Property {
   archivedAt     DateTime?
   archivedBy     String?
 
-  landlord            LandlordProfile     @relation(fields: [landlordId], references: [id])
+  landlord            LandlordProfile      @relation(fields: [landlordId], references: [id])
   units               Unit[]
   invitations         TenantInvitation[]
   leases              Lease[]
@@ -419,8 +428,8 @@ model Unit {
   archivedAt    DateTime?
   archivedBy    String?
 
-  landlord            LandlordProfile     @relation(fields: [landlordId], references: [id])
-  property            Property            @relation(fields: [propertyId], references: [id])
+  landlord            LandlordProfile      @relation(fields: [landlordId], references: [id])
+  property            Property             @relation(fields: [propertyId], references: [id])
   invitations         TenantInvitation[]
   leases              Lease[]
   payments            Payment[]
@@ -446,8 +455,8 @@ model Tenant {
   deactivatedAt         DateTime?
   deactivatedBy         String?
 
-  landlord            LandlordProfile     @relation(fields: [landlordId], references: [id])
-  user                User?               @relation(fields: [userId], references: [id])
+  landlord            LandlordProfile      @relation(fields: [landlordId], references: [id])
+  user                User?                @relation(fields: [userId], references: [id])
   leases              Lease[]
   payments            Payment[]
   invoices            Invoice[]
@@ -495,16 +504,16 @@ model Lease {
   terminatedAt  DateTime?
   terminatedBy  String?
 
-  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
-  property Property        @relation(fields: [propertyId], references: [id])
-  unit     Unit            @relation(fields: [unitId], references: [id])
-  tenant   Tenant          @relation(fields: [tenantId], references: [id])
-  invoices Invoice[]
-  payments Payment[]
-  documents Document[]
-  events LeaseEvent[]
-  renewals LeaseRenewal[]
-  notices LeaseNotice[]
+  landlord         LandlordProfile        @relation(fields: [landlordId], references: [id])
+  property         Property               @relation(fields: [propertyId], references: [id])
+  unit             Unit                   @relation(fields: [unitId], references: [id])
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id])
+  invoices         Invoice[]
+  payments         Payment[]
+  documents        Document[]
+  events           LeaseEvent[]
+  renewals         LeaseRenewal[]
+  notices          LeaseNotice[]
   documentVersions LeaseDocumentVersion[]
 }
 
@@ -565,12 +574,12 @@ model LeaseNotice {
 model LeaseDocumentVersion {
   id            String   @id @default(cuid())
   landlordId    String
-  leaseId        String
-  fileUrl        String
-  fileName       String?
-  documentType   String?
-  versionNumber  Int
-  uploadedAt     DateTime @default(now())
+  leaseId       String
+  fileUrl       String
+  fileName      String?
+  documentType  String?
+  versionNumber Int
+  uploadedAt    DateTime @default(now())
 
   lease Lease @relation(fields: [leaseId], references: [id], onDelete: Cascade)
 
@@ -579,26 +588,26 @@ model LeaseDocumentVersion {
 }
 
 model LeaseAlertSnapshot {
-  id          String                   @id @default(cuid())
-  landlordId  String
-  alertKey    String
-  type        String
-  severity    String
-  title       String
-  description String
-  leaseId     String?
-  tenantId    String?
-  propertyId  String?
-  unitId      String?
+  id            String                   @id @default(cuid())
+  landlordId    String
+  alertKey      String
+  type          String
+  severity      String
+  title         String
+  description   String
+  leaseId       String?
+  tenantId      String?
+  propertyId    String?
+  unitId        String?
   daysRemaining Int?
-  amount      Decimal?
-  status      LeaseAlertSnapshotStatus @default(ACTIVE)
-  firstSeenAt DateTime                 @default(now())
-  lastSeenAt  DateTime                 @default(now())
-  reviewedAt  DateTime?
-  resolvedAt  DateTime?
-  dismissedAt DateTime?
-  metadata    Json?
+  amount        Decimal?
+  status        LeaseAlertSnapshotStatus @default(ACTIVE)
+  firstSeenAt   DateTime                 @default(now())
+  lastSeenAt    DateTime                 @default(now())
+  reviewedAt    DateTime?
+  resolvedAt    DateTime?
+  dismissedAt   DateTime?
+  metadata      Json?
 
   landlord LandlordProfile @relation(fields: [landlordId], references: [id])
 
@@ -610,25 +619,25 @@ model LeaseAlertSnapshot {
 }
 
 model Invoice {
-  id          String        @id @default(cuid())
-  invoiceNo   String        @unique
-  landlordId  String
-  tenantId    String
-  leaseId     String
-  propertyId  String
-  unitId      String
-  amount      Decimal
-  amountPaid  Decimal       @default(0)
-  balance     Decimal
-  dueDate     DateTime
-  sentAt      DateTime?
-  paidAt      DateTime?
-  status      InvoiceStatus @default(NEW)
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  voidedAt    DateTime?
-  voidedBy    String?
+  id         String        @id @default(cuid())
+  invoiceNo  String        @unique
+  landlordId String
+  tenantId   String
+  leaseId    String
+  propertyId String
+  unitId     String
+  amount     Decimal
+  amountPaid Decimal       @default(0)
+  balance    Decimal
+  dueDate    DateTime
+  sentAt     DateTime?
+  paidAt     DateTime?
+  status     InvoiceStatus @default(NEW)
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  voidedAt   DateTime?
+  voidedBy   String?
 
   landlord LandlordProfile @relation(fields: [landlordId], references: [id])
   tenant   Tenant          @relation(fields: [tenantId], references: [id])
@@ -696,17 +705,17 @@ model PaymentProof {
 }
 
 model PaymentMethod {
-  id          String            @id @default(cuid())
-  landlordId  String
-  type        PaymentMethodType
-  label       String
-  details     Json?
-  isDefault   Boolean           @default(false)
-  status      RecordStatus      @default(ACTIVE)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  archivedAt  DateTime?
-  archivedBy  String?
+  id         String            @id @default(cuid())
+  landlordId String
+  type       PaymentMethodType
+  label      String
+  details    Json?
+  isDefault  Boolean           @default(false)
+  status     RecordStatus      @default(ACTIVE)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  archivedAt DateTime?
+  archivedBy String?
 
   landlord LandlordProfile @relation(fields: [landlordId], references: [id])
   payments Payment[]
@@ -781,15 +790,21 @@ model MaintenanceRequest {
   updatedAt            DateTime            @updatedAt
   archivedAt           DateTime?
   archivedBy           String?
+  slaDueAt             DateTime?
+  slaBreachedAt        DateTime?
+  firstResponseAt      DateTime?
+  resolvedAt           DateTime?
 
-  landlord    LandlordProfile          @relation(fields: [landlordId], references: [id])
-  tenant      Tenant?                   @relation(fields: [tenantId], references: [id])
-  property    Property                  @relation(fields: [propertyId], references: [id])
-  unit        Unit?                     @relation(fields: [unitId], references: [id])
-  vendor      MaintenanceVendor?        @relation(fields: [assignedVendorId], references: [id])
+  landlord    LandlordProfile         @relation(fields: [landlordId], references: [id])
+  tenant      Tenant?                 @relation(fields: [tenantId], references: [id])
+  property    Property                @relation(fields: [propertyId], references: [id])
+  unit        Unit?                   @relation(fields: [unitId], references: [id])
+  vendor      MaintenanceVendor?      @relation(fields: [assignedVendorId], references: [id])
   attachments MaintenanceAttachment[]
   comments    MaintenanceComment[]
   workOrders  MaintenanceWorkOrder[]
+
+  @@index([landlordId, slaDueAt])
 }
 
 model MaintenanceAttachment {
@@ -818,36 +833,51 @@ model MaintenanceComment {
 }
 
 model MaintenanceVendor {
-  id             String   @id @default(cuid())
-  landlordId     String
-  name           String
-  email          String?
-  phone          String?
-  specialty      String?
-  approvedStatus Boolean  @default(false)
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  landlordId         String
+  name               String
+  email              String?
+  phone              String?
+  specialty          String?
+  approvedStatus     Boolean   @default(false)
+  notes              String?
+  address            String?
+  licenseNumber      String?
+  insuranceExpiresAt DateTime?
+  userId             String?   @unique
+  portalEnabledAt    DateTime?
+  archivedAt         DateTime?
+  archivedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  landlord             LandlordProfile          @relation(fields: [landlordId], references: [id])
-  assignedRequests     MaintenanceRequest[]
-  workOrders           MaintenanceWorkOrder[]
+  landlord         LandlordProfile        @relation(fields: [landlordId], references: [id])
+  user             User?                  @relation(fields: [userId], references: [id])
+  assignedRequests MaintenanceRequest[]
+  workOrders       MaintenanceWorkOrder[]
 
   @@index([landlordId])
+  @@index([landlordId, archivedAt])
 }
 
 model MaintenanceWorkOrder {
-  id                   String   @id @default(cuid())
+  id                   String          @id @default(cuid())
   maintenanceRequestId String
   vendorId             String?
-  status               String   @default("OPEN")
+  status               WorkOrderStatus @default(OPEN)
   estimatedCost        Decimal?
   actualCost           Decimal?
   scheduledDate        DateTime?
+  dispatchedAt         DateTime?
+  startedAt            DateTime?
   completedAt          DateTime?
+  cancelledAt          DateTime?
+  cancelReason         String?
+  completionNotes      String?
+  vendorAcknowledgedAt DateTime?
   notes                String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   maintenanceRequest MaintenanceRequest @relation(fields: [maintenanceRequestId], references: [id], onDelete: Cascade)
   vendor             MaintenanceVendor? @relation(fields: [vendorId], references: [id])
@@ -879,7 +909,7 @@ model Document {
 }
 
 model Message {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   landlordId String
   senderId   String
   receiverId String
@@ -888,7 +918,7 @@ model Message {
   subject    String
   message    String
   readAt     DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   landlord LandlordProfile @relation(fields: [landlordId], references: [id])
   sender   User            @relation("Sender", fields: [senderId], references: [id])

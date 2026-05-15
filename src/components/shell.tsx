@@ -44,15 +44,24 @@ const tenantLinks: NavLink[] = [
 
 const operationalLinks: NavLink[] = [{ href: '/unauthorized', label: 'Access Pending' }];
 
+const vendorLinks: NavLink[] = [
+  { href: '/vendor/dashboard', label: 'Dashboard' },
+  { href: '/vendor/dashboard?tab=completed', label: 'Completed Work' },
+  { href: '/account/profile', label: 'Profile' },
+];
+
 const LANDLORD_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.LANDLORD,
   UserRole.PROPERTY_MANAGER,
   UserRole.ACCOUNTANT,
 ]);
 
-const OPERATIONAL_ROLES: ReadonlySet<UserRole> = new Set([
+const VENDOR_PORTAL_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.VENDOR,
   UserRole.MAINTENANCE_PROVIDER,
+]);
+
+const OPERATIONAL_ROLES: ReadonlySet<UserRole> = new Set([
   UserRole.CONCIERGE_AGENT,
   UserRole.GUEST,
 ]);
@@ -87,6 +96,7 @@ async function linksForRole(role: UserRole | undefined, userId: string | undefin
     if (!userId) return baseLandlordLinks;
     return landlordLinksWithAlertBadge(userId);
   }
+  if (VENDOR_PORTAL_ROLES.has(role)) return vendorLinks;
   if (OPERATIONAL_ROLES.has(role)) return operationalLinks;
   return [];
 }

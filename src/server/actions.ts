@@ -2,10 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { LeaseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PaymentMethodType, PaymentStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
+import { LeaseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PaymentMethodType, PaymentStatus, RecordStatus, UserRole, UserStatus, WorkOrderStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
-import { getCurrentLandlordWorkspace, requireAuthAllowPasswordChange, requireRole, requireSuperadmin } from '@/lib/auth/guards';
+import { getCurrentLandlordWorkspace, requireAuthAllowPasswordChange, requireRole, requireSuperadmin, requireVendorUser } from '@/lib/auth/guards';
 import { requireOwnedLease, requireOwnedProperty, requireOwnedTenant, requireOwnedUnit } from '@/lib/auth/ownership';
+import { computeSlaDueAt } from '@/lib/maintenance/sla';
+import { assertTransition } from '@/lib/maintenance/workorder';
 import { createInvoiceForLease, applyPaymentToInvoice, generateReceiptForPayment } from '@/lib/payments/invoices';
 import { registerPublicLandlord } from '@/lib/services/registration';
 import { acceptTenantInvitation, createTenantInvitation } from '@/lib/services/invitations';
@@ -195,6 +197,7 @@ export async function createTenantMaintenanceRequestAction(formData: FormData) {
       permissionToEnter: text(formData, 'permissionToEnter') === 'on',
       preferredContactTime: text(formData, 'preferredContactTime') || null,
       photoUrl: text(formData, 'photoUrl') || null,
+      slaDueAt: computeSlaDueAt(priority),
     },
   });
 
@@ -310,11 +313,16 @@ export async function createMaintenanceWorkOrderAction(formData: FormData) {
     if (!vendor) throw new Error('Vendor not found for this workspace.');
   }
 
+  const statusInput = text(formData, 'status');
+  const status = statusInput
+    ? validEnumValue(WorkOrderStatus, statusInput, 'work order status')
+    : WorkOrderStatus.OPEN;
+
   const workOrder = await prisma.maintenanceWorkOrder.create({
     data: {
       maintenanceRequestId,
       vendorId,
-      status: text(formData, 'status') || 'OPEN',
+      status,
       estimatedCost: text(formData, 'estimatedCost') ? positiveNumber(text(formData, 'estimatedCost'), 'Estimated cost') : null,
       scheduledDate: text(formData, 'scheduledDate') ? new Date(text(formData, 'scheduledDate')) : null,
       notes: text(formData, 'notes') || null,
@@ -328,9 +336,28 @@ export async function updateMaintenanceStatusAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
   const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
   const status = validEnumValue(MaintenanceStatus, requiredText(formData, 'status'), 'maintenance status');
+
+  const existing = await prisma.maintenanceRequest.findFirst({
+    where: { id: maintenanceRequestId, landlordId },
+    select: { status: true, firstResponseAt: true, resolvedAt: true },
+  });
+  if (!existing) throw new Error('Maintenance request not found for this workspace.');
+
+  const now = new Date();
+  const data: { status: MaintenanceStatus; firstResponseAt?: Date; resolvedAt?: Date } = { status };
+  if (!existing.firstResponseAt && status !== MaintenanceStatus.OPEN) {
+    data.firstResponseAt = now;
+  }
+  if (
+    !existing.resolvedAt &&
+    (status === MaintenanceStatus.RESOLVED || status === MaintenanceStatus.CLOSED)
+  ) {
+    data.resolvedAt = now;
+  }
+
   const result = await prisma.maintenanceRequest.updateMany({
     where: { id: maintenanceRequestId, landlordId },
-    data: { status },
+    data,
   });
   assertSingleWorkspaceUpdate(result);
   await audit(user.userId, user.email, 'maintenance.status_updated', 'MaintenanceRequest', maintenanceRequestId, landlordId, { status });
@@ -786,6 +813,259 @@ export async function archiveMaintenanceAction(formData: FormData) {
   await audit(user.userId, user.email, 'maintenance.archived', 'MaintenanceRequest', maintenanceId, landlordId);
   revalidatePath('/maintenance');
   revalidatePath('/dashboard');
+}
+
+export async function updateMaintenanceVendorAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendorId = requiredText(formData, 'vendorId');
+  const existing = await prisma.maintenanceVendor.findFirst({ where: { id: vendorId, landlordId } });
+  if (!existing) throw new Error('Vendor not found for this workspace.');
+
+  const insuranceText = text(formData, 'insuranceExpiresAt');
+  const vendor = await prisma.maintenanceVendor.update({
+    where: { id: vendorId },
+    data: {
+      name: requiredText(formData, 'name'),
+      email: text(formData, 'email') || null,
+      phone: text(formData, 'phone') || null,
+      specialty: text(formData, 'specialty') || null,
+      address: text(formData, 'address') || null,
+      licenseNumber: text(formData, 'licenseNumber') || null,
+      insuranceExpiresAt: insuranceText ? new Date(insuranceText) : null,
+      approvedStatus: text(formData, 'approvedStatus') === 'on',
+      notes: text(formData, 'notes') || null,
+    },
+  });
+  await audit(user.userId, user.email, 'maintenance_vendor.updated', 'MaintenanceVendor', vendor.id, landlordId);
+  revalidatePath('/maintenance/vendors');
+  revalidatePath(`/maintenance/vendors/${vendor.id}`);
+}
+
+export async function archiveMaintenanceVendorAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendorId = requiredText(formData, 'vendorId');
+  const result = await prisma.maintenanceVendor.updateMany({
+    where: { id: vendorId, landlordId, archivedAt: null },
+    data: { archivedAt: new Date(), archivedBy: user.userId },
+  });
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'maintenance_vendor.archived', 'MaintenanceVendor', vendorId, landlordId);
+  revalidatePath('/maintenance/vendors');
+}
+
+export async function restoreMaintenanceVendorAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendorId = requiredText(formData, 'vendorId');
+  const result = await prisma.maintenanceVendor.updateMany({
+    where: { id: vendorId, landlordId, archivedAt: { not: null } },
+    data: { archivedAt: null, archivedBy: null },
+  });
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'maintenance_vendor.restored', 'MaintenanceVendor', vendorId, landlordId);
+  revalidatePath('/maintenance/vendors');
+}
+
+export async function enableVendorPortalAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendorId = requiredText(formData, 'vendorId');
+  const vendor = await prisma.maintenanceVendor.findFirst({ where: { id: vendorId, landlordId } });
+  if (!vendor) throw new Error('Vendor not found for this workspace.');
+
+  const portalEmail = requiredText(formData, 'portalEmail').toLowerCase();
+
+  let portalUser = await prisma.user.findUnique({ where: { email: portalEmail } });
+  if (portalUser) {
+    const otherVendor = await prisma.maintenanceVendor.findFirst({
+      where: { userId: portalUser.id, NOT: { id: vendor.id } },
+    });
+    if (otherVendor) throw new Error('That email is already linked to another vendor.');
+    if (
+      portalUser.role !== UserRole.VENDOR &&
+      portalUser.role !== UserRole.MAINTENANCE_PROVIDER &&
+      portalUser.role !== UserRole.SUPERADMIN
+    ) {
+      throw new Error('That email belongs to a non-vendor account.');
+    }
+  } else {
+    portalUser = await prisma.user.create({
+      data: {
+        email: portalEmail,
+        role: UserRole.MAINTENANCE_PROVIDER,
+        status: UserStatus.PENDING_INVITE,
+        mustChangePassword: true,
+      },
+    });
+  }
+
+  await prisma.maintenanceVendor.update({
+    where: { id: vendor.id },
+    data: { userId: portalUser.id, portalEnabledAt: new Date() },
+  });
+  await audit(user.userId, user.email, 'maintenance_vendor.portal_enabled', 'MaintenanceVendor', vendor.id, landlordId, { portalEmail });
+  revalidatePath(`/maintenance/vendors/${vendor.id}`);
+}
+
+export async function disableVendorPortalAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendorId = requiredText(formData, 'vendorId');
+  const result = await prisma.maintenanceVendor.updateMany({
+    where: { id: vendorId, landlordId },
+    data: { userId: null, portalEnabledAt: null },
+  });
+  assertSingleWorkspaceUpdate(result);
+  await audit(user.userId, user.email, 'maintenance_vendor.portal_disabled', 'MaintenanceVendor', vendorId, landlordId);
+  revalidatePath(`/maintenance/vendors/${vendorId}`);
+}
+
+export async function dispatchWorkOrderAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const workOrderId = requiredText(formData, 'workOrderId');
+  const wo = await prisma.maintenanceWorkOrder.findFirst({
+    where: { id: workOrderId, maintenanceRequest: { landlordId } },
+    include: { maintenanceRequest: true },
+  });
+  if (!wo) throw new Error('Work order not found for this workspace.');
+  if (!wo.vendorId) throw new Error('Assign a vendor before dispatching.');
+  assertTransition(wo.status, WorkOrderStatus.DISPATCHED);
+
+  await prisma.maintenanceWorkOrder.update({
+    where: { id: wo.id },
+    data: { status: WorkOrderStatus.DISPATCHED, dispatchedAt: new Date() },
+  });
+  if (!wo.maintenanceRequest.firstResponseAt) {
+    await prisma.maintenanceRequest.update({
+      where: { id: wo.maintenanceRequestId },
+      data: { firstResponseAt: new Date() },
+    });
+  }
+  await audit(user.userId, user.email, 'maintenance_work_order.dispatched', 'MaintenanceWorkOrder', wo.id, landlordId, { vendorId: wo.vendorId });
+  revalidatePath('/maintenance');
+  revalidatePath(`/maintenance/${wo.maintenanceRequestId}`);
+}
+
+export async function updateWorkOrderStatusAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const workOrderId = requiredText(formData, 'workOrderId');
+  const nextStatus = validEnumValue(WorkOrderStatus, requiredText(formData, 'status'), 'work order status');
+  const wo = await prisma.maintenanceWorkOrder.findFirst({
+    where: { id: workOrderId, maintenanceRequest: { landlordId } },
+  });
+  if (!wo) throw new Error('Work order not found for this workspace.');
+  assertTransition(wo.status, nextStatus);
+
+  const now = new Date();
+  const data: Record<string, unknown> = { status: nextStatus };
+  if (nextStatus === WorkOrderStatus.IN_PROGRESS && !wo.startedAt) data.startedAt = now;
+  if (nextStatus === WorkOrderStatus.COMPLETED) {
+    data.completedAt = now;
+    const actualCostInput = text(formData, 'actualCost');
+    if (actualCostInput) data.actualCost = nonNegativeNumber(actualCostInput, 'Actual cost');
+    const completion = text(formData, 'completionNotes');
+    if (completion) data.completionNotes = completion;
+  }
+  if (nextStatus === WorkOrderStatus.CANCELLED) {
+    data.cancelledAt = now;
+    data.cancelReason = text(formData, 'cancelReason') || null;
+  }
+
+  await prisma.maintenanceWorkOrder.update({ where: { id: wo.id }, data });
+
+  if (nextStatus === WorkOrderStatus.COMPLETED) {
+    const otherOpen = await prisma.maintenanceWorkOrder.count({
+      where: {
+        maintenanceRequestId: wo.maintenanceRequestId,
+        id: { not: wo.id },
+        status: { in: [WorkOrderStatus.OPEN, WorkOrderStatus.DISPATCHED, WorkOrderStatus.IN_PROGRESS] },
+      },
+    });
+    if (otherOpen === 0) {
+      await prisma.maintenanceRequest.update({
+        where: { id: wo.maintenanceRequestId },
+        data: { status: MaintenanceStatus.RESOLVED, resolvedAt: now },
+      });
+    }
+  }
+
+  await audit(user.userId, user.email, 'maintenance_work_order.status_updated', 'MaintenanceWorkOrder', wo.id, landlordId, { from: wo.status, to: nextStatus });
+  revalidatePath('/maintenance');
+  revalidatePath(`/maintenance/${wo.maintenanceRequestId}`);
+  revalidatePath('/vendor/dashboard');
+}
+
+export async function vendorAcknowledgeWorkOrderAction(formData: FormData) {
+  const { user, vendor } = await requireVendorUser();
+  const workOrderId = requiredText(formData, 'workOrderId');
+  const wo = await prisma.maintenanceWorkOrder.findFirst({ where: { id: workOrderId, vendorId: vendor.id } });
+  if (!wo) throw new Error('Work order not found.');
+  if (wo.status !== WorkOrderStatus.DISPATCHED && wo.status !== WorkOrderStatus.OPEN) {
+    throw new Error('Only dispatched or open work orders can be accepted.');
+  }
+  await prisma.maintenanceWorkOrder.update({
+    where: { id: wo.id },
+    data: {
+      status: WorkOrderStatus.IN_PROGRESS,
+      vendorAcknowledgedAt: wo.vendorAcknowledgedAt ?? new Date(),
+      startedAt: wo.startedAt ?? new Date(),
+    },
+  });
+  await audit(user.userId, user.email, 'maintenance_work_order.vendor_accepted', 'MaintenanceWorkOrder', wo.id, vendor.landlordId);
+  revalidatePath('/vendor/dashboard');
+  revalidatePath(`/vendor/work-orders/${wo.id}`);
+}
+
+export async function vendorCompleteWorkOrderAction(formData: FormData) {
+  const { user, vendor } = await requireVendorUser();
+  const workOrderId = requiredText(formData, 'workOrderId');
+  const wo = await prisma.maintenanceWorkOrder.findFirst({ where: { id: workOrderId, vendorId: vendor.id } });
+  if (!wo) throw new Error('Work order not found.');
+  if (wo.status !== WorkOrderStatus.IN_PROGRESS) throw new Error('Only in-progress work orders can be completed.');
+
+  const now = new Date();
+  const actualCostInput = text(formData, 'actualCost');
+  await prisma.maintenanceWorkOrder.update({
+    where: { id: wo.id },
+    data: {
+      status: WorkOrderStatus.COMPLETED,
+      completedAt: now,
+      completionNotes: text(formData, 'completionNotes') || null,
+      actualCost: actualCostInput ? nonNegativeNumber(actualCostInput, 'Actual cost') : null,
+    },
+  });
+
+  const otherOpen = await prisma.maintenanceWorkOrder.count({
+    where: {
+      maintenanceRequestId: wo.maintenanceRequestId,
+      id: { not: wo.id },
+      status: { in: [WorkOrderStatus.OPEN, WorkOrderStatus.DISPATCHED, WorkOrderStatus.IN_PROGRESS] },
+    },
+  });
+  if (otherOpen === 0) {
+    await prisma.maintenanceRequest.update({
+      where: { id: wo.maintenanceRequestId },
+      data: { status: MaintenanceStatus.RESOLVED, resolvedAt: now },
+    });
+  }
+  await audit(user.userId, user.email, 'maintenance_work_order.vendor_completed', 'MaintenanceWorkOrder', wo.id, vendor.landlordId);
+  revalidatePath('/vendor/dashboard');
+  revalidatePath(`/vendor/work-orders/${wo.id}`);
+}
+
+export async function vendorAddCommentAction(formData: FormData) {
+  const { user, vendor } = await requireVendorUser();
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const wo = await prisma.maintenanceWorkOrder.findFirst({
+    where: { maintenanceRequestId, vendorId: vendor.id },
+  });
+  if (!wo) throw new Error('You do not have access to this request.');
+  const comment = await prisma.maintenanceComment.create({
+    data: {
+      maintenanceRequestId,
+      authorUserId: user.userId,
+      message: requiredText(formData, 'message'),
+    },
+  });
+  await audit(user.userId, user.email, 'maintenance.comment_added', 'MaintenanceComment', comment.id, vendor.landlordId, { maintenanceRequestId, source: 'vendor_portal' });
+  revalidatePath(`/vendor/work-orders/${wo.id}`);
 }
 
 export async function ensureSuperadminAction() {

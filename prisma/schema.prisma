@@ -319,6 +319,7 @@ model LandlordProfile {
   outboundNotifications OutboundNotification[]
   escalationPolicy      EscalationPolicy?
   alertEscalations      AlertEscalation[]
+  globalVendorLeads     GlobalVendorLead[]
 }
 
 model EscalationPolicy {
@@ -960,6 +961,7 @@ model MaintenanceVendor {
   insuranceExpiresAt DateTime?
   userId             String?   @unique
   portalEnabledAt    DateTime?
+  globalVendorId     String?
   archivedAt         DateTime?
   archivedBy         String?
   createdAt          DateTime  @default(now())
@@ -967,11 +969,13 @@ model MaintenanceVendor {
 
   landlord         LandlordProfile        @relation(fields: [landlordId], references: [id])
   user             User?                  @relation(fields: [userId], references: [id])
+  globalVendor     GlobalVendor?          @relation(fields: [globalVendorId], references: [id])
   assignedRequests MaintenanceRequest[]
   workOrders       MaintenanceWorkOrder[]
 
   @@index([landlordId])
   @@index([landlordId, archivedAt])
+  @@index([globalVendorId])
 }
 
 model GlobalVendor {
@@ -988,6 +992,9 @@ model GlobalVendor {
   featured       Boolean      @default(false)
   sponsored      Boolean      @default(false)
   monthlyFee     Decimal?
+  billingStatus  String       @default("NONE") // NONE|TRIAL|ACTIVE|PAST_DUE|CANCELLED
+  billingNotes   String?
+  paidThrough    DateTime?
   status         RecordStatus @default(ACTIVE)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -995,8 +1002,27 @@ model GlobalVendor {
   archivedBy     String?
   createdBy      String?
 
+  localCopies MaintenanceVendor[]
+  leads       GlobalVendorLead[]
+
   @@index([status])
   @@index([approvedStatus])
+}
+
+model GlobalVendorLead {
+  id             String   @id @default(cuid())
+  globalVendorId String
+  landlordId     String
+  type           String // ADD_TO_LIST | INQUIRY
+  note           String?
+  createdAt      DateTime @default(now())
+
+  globalVendor GlobalVendor    @relation(fields: [globalVendorId], references: [id])
+  landlord     LandlordProfile @relation(fields: [landlordId], references: [id])
+
+  @@index([globalVendorId])
+  @@index([globalVendorId, type])
+  @@index([landlordId])
 }
 
 model MaintenanceWorkOrder {

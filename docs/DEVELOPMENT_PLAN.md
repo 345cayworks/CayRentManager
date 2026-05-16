@@ -96,6 +96,8 @@ Latest confirmed merged work includes:
 - Phase 6 notification infrastructure closeout (alert escalation engine + team-member resolution; SMS/WhatsApp channel abstraction)
 - document vault foundation
 - Phase 5.1 global vendor foundation
+- Phase 5.2 landlord vendor marketplace
+- Phase 5.3 vendor monetization layer (the full Phase 5.x vendor track is now complete)
 - registration workflow tightening
 - professional onboarding page
 - auth input readability fix
@@ -660,6 +662,12 @@ Acceptance criteria:
 
 ## Phase 5.2 — Landlord Vendor Marketplace
 
+Status:
+
+```text
+Complete
+```
+
 Priority:
 
 ```text
@@ -668,7 +676,7 @@ High
 
 Goal:
 
-Allow landlords to browse global vendors and add them to their local vendor list.
+Allow landlords to browse global vendors and add them to their local vendor list. The marketplace lives at `/maintenance/vendors`.
 
 Build:
 
@@ -691,6 +699,12 @@ Acceptance criteria:
 
 ## Phase 5.3 — Vendor Monetization Layer
 
+Status:
+
+```text
+Complete
+```
+
 Priority:
 
 ```text
@@ -710,6 +724,18 @@ Build:
 - lead count tracking
 - manual billing notes
 - later: Stripe/payment integration
+
+Acceptance criteria:
+
+- Superadmins see MRR plus billable/at-risk/trialing and sponsored/featured counts.
+- Per-vendor billing status, monthly fee, paid-through, and notes are editable.
+- Copy-to-local records an `ADD_TO_LIST` lead (best-effort, never blocks the add).
+- Landlords can send an inquiry on an active, approved global vendor.
+- Lead counts are visible per vendor for superadmins.
+
+Deferred (out of scope for this phase): Stripe/payment processor
+integration, automated invoicing/dunning, and inquiry notifications
+through the notification outbox.
 
 ---
 

@@ -3,12 +3,24 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import {
+  addGlobalVendorToWorkspaceAction,
   archiveMaintenanceVendorAction,
   createMaintenanceVendorAction,
+  recordGlobalVendorInquiryAction,
   restoreMaintenanceVendorAction,
 } from '@/server/actions';
 import { getEffectiveTimezone } from '@/lib/time/effective';
 import { formatDate } from '@/lib/time/format';
+import {
+  alreadyAddedIds,
+  filterMarketplaceVendors,
+  sortMarketplaceVendors,
+} from '@/lib/vendors/marketplace';
+
+function isHttpUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  return /^https?:\/\//i.test(value.trim());
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +33,11 @@ function statCard(label: string, value: number | string) {
   );
 }
 
-export default async function VendorsPage() {
+export default async function VendorsPage({
+  searchParams,
+}: {
+  searchParams?: { q?: string; specialty?: string };
+}) {
   const { landlordId } = await getCurrentLandlordWorkspace();
   const tz = await getEffectiveTimezone();
 
@@ -33,6 +49,32 @@ export default async function VendorsPage() {
     },
     orderBy: [{ archivedAt: 'asc' }, { name: 'asc' }],
   });
+
+  const query = (searchParams?.q ?? '').toString();
+  const specialtyFilter = (searchParams?.specialty ?? '').toString();
+
+  const globalVendors = await prisma.globalVendor.findMany({
+    where: { status: 'ACTIVE', approvedStatus: true },
+  });
+
+  const addedIds = alreadyAddedIds(
+    vendors.map((vendor) => ({
+      globalVendorId: vendor.globalVendorId,
+      archivedAt: vendor.archivedAt,
+    })),
+  );
+
+  const specialtyOptions = Array.from(
+    new Set(
+      globalVendors
+        .map((vendor) => (vendor.specialty ?? '').trim())
+        .filter((value) => value.length > 0),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const marketplaceVendors = sortMarketplaceVendors(
+    filterMarketplaceVendors(globalVendors, query, specialtyFilter),
+  );
 
   const requestCounts = await prisma.maintenanceRequest.groupBy({
     by: ['assignedVendorId'],
@@ -123,9 +165,16 @@ export default async function VendorsPage() {
               {activeVendors.map((vendor) => (
                 <tr key={vendor.id} className="align-top hover:bg-slate-50">
                   <td className="px-4 py-4">
-                    <Link className="font-medium text-brand-navy hover:underline" href={`/maintenance/vendors/${vendor.id}`}>
-                      {vendor.name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link className="font-medium text-brand-navy hover:underline" href={`/maintenance/vendors/${vendor.id}`}>
+                        {vendor.name}
+                      </Link>
+                      {vendor.globalVendorId ? (
+                        <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+                          Global
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-xs text-slate-500 mt-1">Added {formatDate(vendor.createdAt, tz)}</p>
                   </td>
                   <td className="px-4 py-4 text-slate-700">{vendor.specialty || '—'}</td>
@@ -224,6 +273,147 @@ export default async function VendorsPage() {
         {archivedVendors.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-500">No archived vendors.</div>
         ) : null}
+      </section>
+
+      <section className="rounded-2xl border bg-white shadow-sm overflow-hidden mt-8">
+        <header className="px-4 py-3 border-b bg-slate-50">
+          <h3 className="font-semibold">Vendor Marketplace</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Browse vetted vendors from the CayRentManager network and add them to your private vendor list.
+          </p>
+        </header>
+
+        <div className="border-b bg-white p-4">
+          <form method="get" className="flex flex-col gap-3 md:flex-row md:items-end">
+            <label className="flex flex-col text-sm text-slate-600">
+              <span className="mb-1">Search</span>
+              <input
+                name="q"
+                defaultValue={query}
+                placeholder="Name, specialty, or service area"
+                className="border rounded px-3 py-2 md:w-72"
+              />
+            </label>
+            <label className="flex flex-col text-sm text-slate-600">
+              <span className="mb-1">Specialty</span>
+              <select name="specialty" defaultValue={specialtyFilter} className="border rounded px-3 py-2 md:w-56">
+                <option value="">All specialties</option>
+                {specialtyOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="rounded bg-brand-navy text-white px-4 py-2 text-sm">Filter</button>
+          </form>
+        </div>
+
+        {marketplaceVendors.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-500">
+            {globalVendors.length === 0
+              ? 'No marketplace vendors are available yet.'
+              : 'No vendors match your search.'}
+          </div>
+        ) : (
+          <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {marketplaceVendors.map((vendor) => {
+              const added = addedIds.has(vendor.id);
+              return (
+                <div
+                  key={vendor.id}
+                  className={`flex flex-col rounded-xl border p-4 shadow-sm ${
+                    vendor.sponsored ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {isHttpUrl(vendor.logoUrl) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={vendor.logoUrl}
+                        alt={`${vendor.name} logo`}
+                        className="h-12 w-12 rounded object-contain border bg-white"
+                      />
+                    ) : null}
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-slate-800">{vendor.name}</p>
+                        {vendor.sponsored ? (
+                          <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                            Sponsored
+                          </span>
+                        ) : null}
+                        {vendor.featured ? (
+                          <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+                            Featured
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">{vendor.specialty || 'General'}</p>
+                    </div>
+                  </div>
+
+                  {vendor.serviceAreas ? (
+                    <p className="mt-3 text-sm text-slate-600">
+                      <span className="font-medium text-slate-500">Service areas: </span>
+                      {vendor.serviceAreas}
+                    </p>
+                  ) : null}
+
+                  {vendor.description ? (
+                    <p className="mt-2 text-sm text-slate-600">{vendor.description}</p>
+                  ) : null}
+
+                  {isHttpUrl(vendor.website) ? (
+                    <a
+                      href={vendor.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 text-sm text-brand-navy hover:underline"
+                    >
+                      Visit website
+                    </a>
+                  ) : vendor.website ? (
+                    <p className="mt-2 text-sm text-slate-600">{vendor.website}</p>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-col gap-2">
+                    {added ? (
+                      <span className="inline-flex w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                        Added ✓
+                      </span>
+                    ) : (
+                      <form action={addGlobalVendorToWorkspaceAction}>
+                        <input type="hidden" name="globalVendorId" value={vendor.id} />
+                        <button className="rounded bg-brand-navy text-white px-4 py-2 text-xs font-medium">
+                          Add to My Vendors
+                        </button>
+                      </form>
+                    )}
+                    <details className="text-xs text-slate-600">
+                      <summary className="cursor-pointer text-brand-navy hover:underline">
+                        Request a quote
+                      </summary>
+                      <form action={recordGlobalVendorInquiryAction} className="mt-2 flex flex-col gap-2">
+                        <input type="hidden" name="globalVendorId" value={vendor.id} />
+                        <textarea
+                          name="note"
+                          maxLength={500}
+                          rows={2}
+                          placeholder="What do you need?"
+                          className="border rounded px-2 py-1"
+                        />
+                        <button className="w-fit rounded border px-3 py-1 font-medium hover:bg-slate-50">
+                          Send inquiry
+                        </button>
+                      </form>
+                    </details>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </Shell>
   );

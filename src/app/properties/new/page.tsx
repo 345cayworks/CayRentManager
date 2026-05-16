@@ -32,6 +32,7 @@ export default async function NewPropertyPage() {
 
           <form
             action={createPropertyGuidedAction}
+            encType="multipart/form-data"
             className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
           >
             <div className="grid gap-4 md:grid-cols-2">
@@ -107,6 +108,19 @@ export default async function NewPropertyPage() {
                   step="0.01"
                   className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
                 />
+              </label>
+              <label className="block text-sm md:col-span-2">
+                <span className="font-medium text-slate-700">Photos</span>
+                <input
+                  type="file"
+                  name="photos"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  className="mt-1 block w-full text-sm"
+                />
+                <span className="mt-1 block text-xs text-slate-500">
+                  Optional — you can also add photos later from the detail page.
+                </span>
               </label>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 pt-3">

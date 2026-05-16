@@ -5,6 +5,7 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { archiveUnitAction, updateUnitAction } from '@/server/actions';
+import { PhotoManager } from '@/components/photo-manager';
 import { getEffectiveTimezone } from '@/lib/time/effective';
 import { formatDate } from '@/lib/time/format';
 
@@ -44,6 +45,11 @@ export default async function Page({
   });
 
   if (!unit) redirect('/unauthorized');
+
+  const unitPhotos = await prisma.unitPhoto.findMany({
+    where: { unitId: unit.id, archivedAt: null },
+    orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+  });
 
   const activeLease = unit.leases[0] ?? null;
   const outstandingBalance = unit.payments.reduce(
@@ -176,6 +182,17 @@ export default async function Page({
               </form>
             </details>
           </section>
+
+          <PhotoManager
+            kind="unit"
+            entityId={unit.id}
+            photos={unitPhotos.map((p) => ({
+              id: p.id,
+              fileName: p.fileName,
+              isPrimary: p.isPrimary,
+              contentType: p.contentType,
+            }))}
+          />
 
           <section className="rounded-xl bg-white border shadow-sm p-4">
             <h3 className="font-semibold">Balance summary</h3>

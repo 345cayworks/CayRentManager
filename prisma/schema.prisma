@@ -444,6 +444,7 @@ model Property {
   expenses            Expense[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
+  photos              PropertyPhoto[]
 }
 
 model Unit {
@@ -471,6 +472,47 @@ model Unit {
   expenses            Expense[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
+  photos              UnitPhoto[]
+}
+
+model PropertyPhoto {
+  id          String    @id @default(cuid())
+  landlordId  String
+  propertyId  String
+  storageKey  String
+  fileName    String
+  contentType String
+  fileSize    Int
+  isPrimary   Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  uploadedBy  String
+  createdAt   DateTime  @default(now())
+  archivedAt  DateTime?
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([landlordId])
+}
+
+model UnitPhoto {
+  id          String    @id @default(cuid())
+  landlordId  String
+  unitId      String
+  storageKey  String
+  fileName    String
+  contentType String
+  fileSize    Int
+  isPrimary   Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  uploadedBy  String
+  createdAt   DateTime  @default(now())
+  archivedAt  DateTime?
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([landlordId])
 }
 
 model Tenant {

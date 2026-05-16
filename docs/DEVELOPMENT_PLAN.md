@@ -99,6 +99,7 @@ Latest confirmed merged work includes:
 - auth input readability fix
 - password visibility toggles
 - Phase 7 real upload infrastructure (Netlify Blobs)
+- Property & Unit Photos (galleries, primary photo, list thumbnails, secure image endpoints)
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -444,7 +445,12 @@ Note:
 ```text
 /api/documents/[documentId]/download
 /api/maintenance/attachments/[attachmentId]/download
+/api/properties/[propertyId]/photos/[photoId]
+/api/units/[unitId]/photos/[photoId]
 ```
+
+Property and unit detail/list routes also surface photo galleries and
+primary-photo thumbnails.
 
 ---
 
@@ -740,6 +746,8 @@ Implemented:
 - broken-placeholder remediation: migration backfills legacy placeholder
   rows to `BROKEN_PLACEHOLDER`, UI flags them, hard-delete remediation action
 - image/PDF inline preview vs. attachment download
+- property & unit photo galleries (primary photo, list thumbnails, secure
+  image endpoints) — see docs/PROPERTY_UNIT_PHOTOS.md
 
 ---
 

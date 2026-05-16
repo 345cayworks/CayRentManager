@@ -14,6 +14,12 @@ export default async function Page() {
     prisma.unit.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, include: { property: true }, orderBy: { createdAt: 'desc' } }),
   ]);
 
+  const primaryPhotos = await prisma.unitPhoto.findMany({
+    where: { landlordId, isPrimary: true, archivedAt: null },
+    select: { id: true, unitId: true },
+  });
+  const primaryByUnit = new Map(primaryPhotos.map((p) => [p.unitId, p.id]));
+
   return (
     <Shell title="Units">
       <form action={createUnitAction} className="grid md:grid-cols-6 gap-3 rounded-xl bg-white border shadow-sm p-4 mb-4">
@@ -31,11 +37,24 @@ export default async function Page() {
         {units.length === 0 ? <p className="p-4 text-slate-600">No units yet.</p> : null}
         {units.map((unit) => (
           <div key={unit.id} className="p-4 flex justify-between gap-4">
-            <div>
-              <Link href={`/units/${unit.id}`} className="font-medium text-brand-navy">
-                {unit.unitName}
-              </Link>
-              <p className="text-sm text-slate-600">{unit.property.name}</p>
+            <div className="flex items-center gap-3">
+              {primaryByUnit.has(unit.id) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/units/${unit.id}/photos/${primaryByUnit.get(unit.id)}`}
+                  alt={unit.unitName}
+                  loading="lazy"
+                  className="h-12 w-12 rounded-lg border border-slate-200 object-cover"
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-lg border border-slate-200 bg-slate-100" />
+              )}
+              <div>
+                <Link href={`/units/${unit.id}`} className="font-medium text-brand-navy">
+                  {unit.unitName}
+                </Link>
+                <p className="text-sm text-slate-600">{unit.property.name}</p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <p className="font-medium">${Number(unit.rentAmount).toFixed(2)}</p>

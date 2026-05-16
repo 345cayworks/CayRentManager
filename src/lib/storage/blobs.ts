@@ -2,6 +2,7 @@ import { getStore } from '@netlify/blobs';
 
 const DOCUMENT_STORE = 'crm-documents';
 const MAINTENANCE_STORE = 'crm-maintenance-attachments';
+const PROPERTY_PHOTO_STORE = 'crm-property-photos';
 
 export function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'file';
@@ -62,4 +63,44 @@ export async function getMaintenanceBlob(
 
 export async function deleteMaintenanceBlob(key: string) {
   await maintenanceStore().delete(key);
+}
+
+export function propertyPhotoKey(
+  landlordId: string,
+  propertyId: string,
+  photoId: string,
+  fileName: string,
+): string {
+  return `${landlordId}/property/${propertyId}/${photoId}/${sanitizeFileName(fileName)}`;
+}
+
+export function unitPhotoKey(
+  landlordId: string,
+  unitId: string,
+  photoId: string,
+  fileName: string,
+): string {
+  return `${landlordId}/unit/${unitId}/${photoId}/${sanitizeFileName(fileName)}`;
+}
+
+function photoStore() {
+  return getStore({ name: PROPERTY_PHOTO_STORE, consistency: 'strong' });
+}
+
+export async function putPhotoBlob(key: string, file: File) {
+  const buf = Buffer.from(await file.arrayBuffer());
+  await photoStore().set(key, buf, { metadata: { contentType: file.type, fileName: file.name } });
+  return { size: buf.length, contentType: file.type };
+}
+
+export async function getPhotoBlob(
+  key: string,
+): Promise<{ data: ArrayBuffer; metadata: Record<string, unknown> } | null> {
+  const res = await photoStore().getWithMetadata(key, { type: 'arrayBuffer' });
+  if (!res) return null;
+  return { data: res.data as ArrayBuffer, metadata: (res.metadata ?? {}) as Record<string, unknown> };
+}
+
+export async function deletePhotoBlob(key: string) {
+  await photoStore().delete(key);
 }

@@ -29,3 +29,24 @@ export function canAccessDocument(
   }
   return false; // vendors and others: no document access
 }
+
+export type PhotoAccessUser = { userId: string; role: UserRole } | null;
+
+/** Pure decision function — landlord/superadmin only. No IO. */
+export function canAccessPropertyPhoto(
+  user: PhotoAccessUser,
+  photoLandlordId: string,
+  membershipLandlordIds: string[],
+): boolean {
+  if (!user) return false;
+  if (user.role === UserRole.SUPERADMIN) return true;
+  const landlordRoles: UserRole[] = [
+    UserRole.LANDLORD,
+    UserRole.PROPERTY_MANAGER,
+    UserRole.ACCOUNTANT,
+  ];
+  if (landlordRoles.includes(user.role)) {
+    return membershipLandlordIds.includes(photoLandlordId);
+  }
+  return false;
+}

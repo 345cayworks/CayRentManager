@@ -10,7 +10,7 @@ import {
   setLandlordTemporaryPassword,
 } from '@/lib/services/superadmin-landlord';
 
-const DEFAULT_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '';
+const DEFAULT_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || '';
 
 async function trySendPasswordResetEmail(request: Request, email: string) {
   try {

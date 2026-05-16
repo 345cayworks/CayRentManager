@@ -6,6 +6,7 @@ import {
   deleteUnitPhotoAction,
   setPrimaryUnitPhotoAction,
 } from '@/server/actions';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 
 export type PhotoManagerPhoto = {
   id: string;
@@ -73,12 +74,12 @@ export function PhotoManager({
                 )}
                 <form action={deleteAction} className="ml-auto">
                   <input type="hidden" name="photoId" value={photo.id} />
-                  <button
-                    type="submit"
+                  <ConfirmButton
+                    message="Delete this photo? This cannot be undone."
                     className="text-xs font-medium text-rose-600 hover:underline"
                   >
                     Delete
-                  </button>
+                  </ConfirmButton>
                 </form>
               </div>
             </li>

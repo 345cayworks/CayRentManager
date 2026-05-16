@@ -108,6 +108,7 @@ Latest confirmed merged work includes:
 - Phase 9 tenant portal expansion (tenant lease view, payment history + balance, two-way landlord⇄tenant messaging with inbox/thread, unread badges; owner statements/attachments/email-SMS-of-messages/realtime deferred)
 - Landlord⇄Vendor messaging (generalized inbox for tenants AND portal-linked vendors, landlord vendor thread + vendor-portal thread, vendor mark-read + nav badge; schema-free); Phase 5.3 marketplace "Request a quote" now actually delivers (in-app message to a portal-linked workspace copy of the global vendor, else queued email via the Phase 6 outbox, lead always recorded)
 - Vendor Portal Governance (landlord direct-enable removed; landlords submit a `VendorPortalRequest`, superadmin approves/rejects or directly enables; one-pending-per-vendor partial unique; landlord can cancel pending + disable enabled; `/admin/vendor-portal` review console)
+- Phase 10 polish foundation (responsive Shell with mobile drawer; global-error/error/not-found/loading boundaries; EmptyState + ConfirmButton on destructive actions + search-param Toaster; /terms + /privacy scaffolds + registration consent; backup/recovery + public-beta-checklist runbooks) plus housekeeping (marketplace section moved above "Add a vendor"; Rent Roll card removed from superadmin dashboard; full `.env.example`; base URL standardized on `NEXT_PUBLIC_APP_URL`)
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -396,6 +397,8 @@ Future enhancements (out of scope for Phase 2 closeout):
 /
 /login
 /register
+/terms
+/privacy
 /invite/[token]
 /unauthorized
 ```
@@ -915,24 +918,46 @@ Build:
 
 ## Phase 10 — Production Polish & Public Beta
 
-Priority:
+Status:
 
 ```text
-Ongoing
+In Progress — foundation shipped
 ```
 
-Build:
+Shipped (foundation):
 
-- mobile polish
-- empty states
-- loading states
-- toasts
-- confirmation modals
-- error boundaries
-- privacy policy
-- terms of service
-- backup/recovery process
-- public beta onboarding checklist
+- Responsive Shell — mobile top bar + slide-in drawer (`MobileNav` client
+  child); desktop 240px sidebar layout visually unchanged; nav badge logic and
+  `SignOutPanel` pass through both layouts
+- Route boundaries — `global-error.tsx`, `error.tsx` (no stack traces in prod
+  text), `not-found.tsx`, `loading.tsx`
+- UI primitives — `EmptyState`, `ConfirmButton` (progressive-enhancement
+  confirm) wired to the destructive actions (vendor archive, document archive,
+  broken-placeholder delete, property/unit photo delete, tenant deactivate,
+  lease terminate, disable vendor portal), search-param-driven `Toaster`
+  mounted in Shell with tested `buildToastFromSearchParams` helper
+- Legal scaffold — `/terms` + `/privacy` (draft, counsel review pending),
+  linked from `/login`, `/register`, marketing `/`; required registration
+  consent checkbox
+- Beta marker in Shell header
+- Ops docs — `docs/BACKUP_RECOVERY.md`, `docs/PUBLIC_BETA_CHECKLIST.md`
+- See `docs/PHASE10_POLISH_COMPLETION.md` for the shipped-vs-deferred summary
+
+Remaining (iterative):
+
+- Comprehensive toast wiring across all redirecting actions (component is
+  mounted and ready; flows still mostly use bespoke/page-local banners)
+- Full page-by-page mobile polish pass beyond the global Shell
+- Counsel-reviewed legal copy (currently marked draft)
+
+### Housekeeping (this sprint)
+
+- `/maintenance/vendors`: Vendor Marketplace section moved to the top
+  (after stat cards, before "Add a vendor"); marketplace logic/queries/sorting
+  unchanged
+- Superadmin dashboard: removed the Rent Roll quick-action card
+- `.env.example`: full grouped reference for all referenced vars; base URL
+  standardized on `NEXT_PUBLIC_APP_URL` (`NEXT_PUBLIC_BASE_URL` removed)
 
 ---
 

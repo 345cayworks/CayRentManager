@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { LeaseEventType, LeaseNoticeType, LeaseRenewalStatus, LeaseStatus, PaymentStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { expireLeaseAction, terminateLeaseAction } from '@/server/actions';
@@ -261,7 +262,7 @@ export default async function Page({ params }: { params: { id: string } }) {
               <Link href="/leases" className="block text-brand-navy">Back to leases</Link>
               <Link href="/payments" className="block text-brand-navy">Record payment</Link>
             </div>
-            <form action={terminateLeaseAction}><input type="hidden" name="leaseId" value={lease.id} /><button className="rounded border px-3 py-2 w-full text-left">Terminate lease</button></form>
+            <form action={terminateLeaseAction}><input type="hidden" name="leaseId" value={lease.id} /><ConfirmButton message="Terminate this lease? This ends the active tenancy." className="rounded border px-3 py-2 w-full text-left">Terminate lease</ConfirmButton></form>
             <form action={expireLeaseAction}><input type="hidden" name="leaseId" value={lease.id} /><button className="rounded border px-3 py-2 w-full text-left">Expire lease</button></form>
           </section>
 

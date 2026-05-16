@@ -69,6 +69,11 @@ export default function LoginPage() {
               </Link>
             </div>
 
+            <div className="mt-6 flex flex-wrap gap-4 text-xs text-slate-400">
+              <Link href="/terms" className="hover:text-white">Terms</Link>
+              <Link href="/privacy" className="hover:text-white">Privacy</Link>
+            </div>
+
             <div className="mt-8 grid gap-3 lg:hidden">
               {highlights.slice(0, 3).map((item) => (
                 <div key={item} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { deactivateTenantAction, inviteTenantAction } from '@/server/actions';
@@ -64,9 +65,12 @@ export default async function Page() {
                 </Link>
                 <form action={deactivateTenantAction}>
                   <input type="hidden" name="tenantId" value={tenant.id} />
-                  <button className="text-sm rounded border border-slate-200 px-3 py-1 text-slate-500 hover:bg-slate-50">
+                  <ConfirmButton
+                    message={`Deactivate ${tenant.fullName ?? 'this tenant'}? They will lose portal access.`}
+                    className="text-sm rounded border border-slate-200 px-3 py-1 text-slate-500 hover:bg-slate-50"
+                  >
                     Deactivate
-                  </button>
+                  </ConfirmButton>
                 </form>
               </div>
             </div>

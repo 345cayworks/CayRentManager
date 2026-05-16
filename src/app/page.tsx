@@ -207,6 +207,8 @@ export default function HomePage() {
             <Link href="/login" className="rounded-full border border-white/10 px-3 py-2 hover:text-white sm:border-0 sm:px-0 sm:py-0">Log in</Link>
             <Link href="/register" className="rounded-full border border-white/10 px-3 py-2 hover:text-white sm:border-0 sm:px-0 sm:py-0">Start</Link>
             <a href="#demo" className="rounded-full border border-white/10 px-3 py-2 hover:text-white sm:border-0 sm:px-0 sm:py-0">Demo</a>
+            <Link href="/terms" className="rounded-full border border-white/10 px-3 py-2 hover:text-white sm:border-0 sm:px-0 sm:py-0">Terms</Link>
+            <Link href="/privacy" className="rounded-full border border-white/10 px-3 py-2 hover:text-white sm:border-0 sm:px-0 sm:py-0">Privacy</Link>
           </div>
         </div>
       </footer>

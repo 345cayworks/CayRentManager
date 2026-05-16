@@ -56,12 +56,6 @@ export default async function Page() {
       icon: '💰',
     },
     {
-      href: '/financials/rent-roll',
-      title: 'Rent Roll',
-      description: 'Rent collection and tenant payments.',
-      icon: '📊',
-    },
-    {
       href: '/api/health',
       title: 'Health Check',
       description: 'System status and database connectivity.',

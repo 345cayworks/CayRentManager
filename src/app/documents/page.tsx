@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { DocumentSource, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import {
@@ -287,12 +288,12 @@ export default async function Page() {
                         {isBroken ? (
                           <form action={deleteBrokenPlaceholderAction}>
                             <input type="hidden" name="documentId" value={document.id} />
-                            <button type="submit" className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500">Remove record</button>
+                            <ConfirmButton message="Remove this broken document record? This cannot be undone." className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500">Remove record</ConfirmButton>
                           </form>
                         ) : (
                           <form action={archiveDocumentAction}>
                             <input type="hidden" name="documentId" value={document.id} />
-                            <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Archive</button>
+                            <ConfirmButton message="Archive this document?" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Archive</ConfirmButton>
                           </form>
                         )}
                       </div>

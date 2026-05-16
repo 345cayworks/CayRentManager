@@ -6,6 +6,8 @@ import { prisma } from '@/lib/db/prisma';
 import { getOnboardingState } from '@/lib/onboarding/state';
 import { getEffectiveTimezone } from '@/lib/time/effective';
 import { SignOutPanel } from '@/components/sign-out-panel';
+import { MobileNav } from '@/components/mobile-nav';
+import { Toaster } from '@/components/ui/toaster';
 
 type NavLink = { href: string; label: string; badge?: number };
 
@@ -201,32 +203,49 @@ export async function Shell({ title, children }: { title: string; children?: Rea
     }
   }
 
+  const navContent = (
+    <>
+      <nav className="space-y-2">
+        {links.map((link) => (
+          <Link
+            key={link.href}
+            className="flex items-center justify-between text-sm hover:underline"
+            href={link.href}
+          >
+            <span>{link.label}</span>
+            {link.badge ? <Badge count={link.badge} /> : null}
+          </Link>
+        ))}
+      </nav>
+      {user && (
+        <div className="mt-auto">
+          {timezone && (
+            <p className="mb-2 text-xs text-slate-400">Times shown in {timezone}</p>
+          )}
+          <SignOutPanel email={user.email} role={user.role} name={user.name} />
+        </div>
+      )}
+    </>
+  );
+
+  const brand = (
+    <span className="inline-flex items-center gap-2">
+      CayRentManager
+      <span className="rounded-full bg-cyan-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">
+        Beta
+      </span>
+    </span>
+  );
+
   return (
-    <div className="min-h-screen grid grid-cols-[240px_1fr]">
-      <aside className="bg-brand-navy text-white p-4 flex flex-col">
-        <h1 className="text-lg font-semibold mb-4">CayRentManager</h1>
-        <nav className="space-y-2">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              className="flex items-center justify-between text-sm hover:underline"
-              href={link.href}
-            >
-              <span>{link.label}</span>
-              {link.badge ? <Badge count={link.badge} /> : null}
-            </Link>
-          ))}
-        </nav>
-        {user && (
-          <div className="mt-auto">
-            {timezone && (
-              <p className="mb-2 text-xs text-slate-400">Times shown in {timezone}</p>
-            )}
-            <SignOutPanel email={user.email} role={user.role} name={user.name} />
-          </div>
-        )}
+    <div className="min-h-screen md:grid md:grid-cols-[240px_1fr]">
+      <MobileNav title={brand}>{navContent}</MobileNav>
+      <aside className="hidden bg-brand-navy text-white p-4 md:flex md:flex-col">
+        <h1 className="text-lg font-semibold mb-4">{brand}</h1>
+        {navContent}
       </aside>
-      <main className="p-6">
+      <main className="w-full p-6">
+        <Toaster />
         <h2 className="text-2xl font-semibold mb-6">{title}</h2>
         {children}
       </main>

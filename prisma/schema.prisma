@@ -36,6 +36,17 @@ enum RecordStatus {
   INACTIVE
 }
 
+enum DocumentVisibility {
+  LANDLORD_ONLY
+  TENANT_VISIBLE
+}
+
+enum DocumentSource {
+  EXTERNAL
+  STORED
+  BROKEN_PLACEHOLDER
+}
+
 enum LeaseStatus {
   DRAFT
   ACTIVE
@@ -433,6 +444,7 @@ model Property {
   expenses            Expense[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
+  photos              PropertyPhoto[]
 }
 
 model Unit {
@@ -460,6 +472,47 @@ model Unit {
   expenses            Expense[]
   maintenanceRequests MaintenanceRequest[]
   documents           Document[]
+  photos              UnitPhoto[]
+}
+
+model PropertyPhoto {
+  id          String    @id @default(cuid())
+  landlordId  String
+  propertyId  String
+  storageKey  String
+  fileName    String
+  contentType String
+  fileSize    Int
+  isPrimary   Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  uploadedBy  String
+  createdAt   DateTime  @default(now())
+  archivedAt  DateTime?
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([landlordId])
+}
+
+model UnitPhoto {
+  id          String    @id @default(cuid())
+  landlordId  String
+  unitId      String
+  storageKey  String
+  fileName    String
+  contentType String
+  fileSize    Int
+  isPrimary   Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  uploadedBy  String
+  createdAt   DateTime  @default(now())
+  archivedAt  DateTime?
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([landlordId])
 }
 
 model Tenant {
@@ -833,8 +886,12 @@ model MaintenanceRequest {
 model MaintenanceAttachment {
   id                   String   @id @default(cuid())
   maintenanceRequestId String
-  fileUrl              String
+  landlordId           String?
+  fileUrl              String?
+  storageKey           String?
+  fileSize             Int?
   fileType             String?
+  uploadedBy           String?
   uploadedAt           DateTime @default(now())
 
   maintenanceRequest MaintenanceRequest @relation(fields: [maintenanceRequestId], references: [id], onDelete: Cascade)
@@ -909,7 +966,7 @@ model MaintenanceWorkOrder {
 }
 
 model Document {
-  id           String       @id @default(cuid())
+  id           String             @id @default(cuid())
   landlordId   String
   propertyId   String?
   unitId       String?
@@ -918,9 +975,14 @@ model Document {
   documentType String
   fileName     String
   fileUrl      String
-  status       RecordStatus @default(ACTIVE)
+  storageKey   String?
+  fileSize     Int?
+  contentType  String?
+  visibility   DocumentVisibility @default(LANDLORD_ONLY)
+  source       DocumentSource     @default(EXTERNAL)
+  status       RecordStatus       @default(ACTIVE)
   uploadedBy   String
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime           @default(now())
   archivedAt   DateTime?
   archivedBy   String?
 

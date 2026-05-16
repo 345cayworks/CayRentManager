@@ -15,6 +15,8 @@ import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 import { calculatePaymentBalance, calculatePaymentStatus, validatePaymentDates } from '@/lib/validation/payments';
 import { isSupportedCurrency, isSupportedTimezone } from '@/lib/time/format';
 import { setPlatformSetting } from '@/lib/settings/platform';
+import { maintenanceAttachmentKey, putMaintenanceBlob, propertyPhotoKey, unitPhotoKey, putPhotoBlob, deletePhotoBlob } from '@/lib/storage/blobs';
+import { validateUploadFile, validateImageFile } from '@/lib/storage/validate';
 
 const operationalRoles: UserRole[] = [
   UserRole.VENDOR,
@@ -177,6 +179,16 @@ export async function createPropertyGuidedAction(formData: FormData) {
     },
   });
   await audit(user.userId, user.email, 'property.created', 'Property', property.id, landlordId, { source: 'onboarding_wizard' });
+
+  const photoFiles = formData.getAll('photos').filter((v): v is File => v instanceof File && v.size > 0);
+  if (photoFiles.length > 0) {
+    try {
+      await uploadEntityPhotos({ files: photoFiles, landlordId, userId: user.userId, userEmail: user.email, kind: 'property', entityId: property.id });
+    } catch {
+      // Property is already created — a photo failure must not abort the wizard.
+    }
+  }
+
   revalidatePath('/properties');
   revalidatePath('/dashboard');
   revalidatePath('/onboarding');
@@ -210,6 +222,16 @@ export async function createUnitGuidedAction(formData: FormData) {
     },
   });
   await audit(user.userId, user.email, 'unit.created', 'Unit', unit.id, landlordId, { source: 'onboarding_wizard' });
+
+  const photoFiles = formData.getAll('photos').filter((v): v is File => v instanceof File && v.size > 0);
+  if (photoFiles.length > 0) {
+    try {
+      await uploadEntityPhotos({ files: photoFiles, landlordId, userId: user.userId, userEmail: user.email, kind: 'unit', entityId: unit.id });
+    } catch {
+      // Unit is already created — a photo failure must not abort the wizard.
+    }
+  }
+
   revalidatePath('/units');
   revalidatePath('/dashboard');
   revalidatePath('/onboarding');
@@ -426,6 +448,62 @@ export async function addMaintenanceAttachmentAction(formData: FormData) {
   revalidatePath('/maintenance');
 }
 
+export async function uploadMaintenanceAttachmentAction(formData: FormData) {
+  const user = await requireRole([UserRole.TENANT, UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.SUPERADMIN]);
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const request = await prisma.maintenanceRequest.findFirst({
+    where: user.role === UserRole.TENANT
+      ? { id: maintenanceRequestId, tenant: { userId: user.userId } }
+      : { id: maintenanceRequestId },
+  });
+  if (!request) throw new Error('Maintenance request not found.');
+
+  if (user.role !== UserRole.TENANT && user.role !== UserRole.SUPERADMIN) {
+    await requireOwnedProperty(request.landlordId, request.propertyId);
+  }
+
+  const fileValue = formData.get('file');
+  if (!(fileValue instanceof File) || fileValue.size === 0) {
+    throw new Error('Please select a file to upload.');
+  }
+  validateUploadFile(fileValue);
+
+  const attachment = await prisma.maintenanceAttachment.create({
+    data: {
+      maintenanceRequestId,
+      landlordId: request.landlordId,
+      uploadedBy: user.userId,
+      fileUrl: null,
+      fileType: fileValue.type,
+    },
+  });
+
+  const key = maintenanceAttachmentKey(request.landlordId, request.id, attachment.id, fileValue.name);
+
+  let size: number;
+  try {
+    const result = await putMaintenanceBlob(key, fileValue);
+    size = result.size;
+  } catch (error) {
+    await prisma.maintenanceAttachment.delete({ where: { id: attachment.id } });
+    throw new Error(
+      `Upload failed — the file could not be stored, so no record was kept. ${
+        error instanceof Error ? error.message : 'Unknown storage error.'
+      }`,
+    );
+  }
+
+  await prisma.maintenanceAttachment.update({
+    where: { id: attachment.id },
+    data: { storageKey: key, fileSize: size, fileType: fileValue.type },
+  });
+
+  await audit(user.userId, user.email, 'maintenance.attachment_uploaded', 'MaintenanceAttachment', attachment.id, request.landlordId, { maintenanceRequestId, fileSize: size });
+  revalidatePath('/tenant/maintenance');
+  revalidatePath('/maintenance');
+  revalidatePath(`/maintenance/${maintenanceRequestId}`);
+}
+
 export async function addMaintenanceCommentAction(formData: FormData) {
   const user = await requireRole([UserRole.TENANT, UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.MAINTENANCE_PROVIDER, UserRole.SUPERADMIN]);
   const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
@@ -546,6 +624,124 @@ export async function updateMaintenanceStatusAction(formData: FormData) {
   revalidatePath('/maintenance');
   revalidatePath('/tenant/maintenance');
   revalidatePath('/dashboard');
+}
+
+async function uploadEntityPhotos(opts: {
+  files: File[];
+  landlordId: string;
+  userId: string;
+  userEmail: string;
+  kind: 'property' | 'unit';
+  entityId: string;
+}) {
+  // validate ALL first so a bad file rejects the batch before any blob write
+  const valid = opts.files.filter((f) => f && f.size > 0);
+  valid.forEach(validateImageFile);
+  for (let i = 0; i < valid.length; i++) {
+    const file = valid[i];
+    if (opts.kind === 'property') {
+      const photo = await prisma.propertyPhoto.create({
+        data: { landlordId: opts.landlordId, propertyId: opts.entityId, storageKey: '', fileName: file.name, contentType: file.type, fileSize: 0, uploadedBy: opts.userId, sortOrder: Date.now() + i },
+      });
+      const key = propertyPhotoKey(opts.landlordId, opts.entityId, photo.id, file.name);
+      try {
+        const { size, contentType } = await putPhotoBlob(key, file);
+        await prisma.propertyPhoto.update({ where: { id: photo.id }, data: { storageKey: key, fileSize: size, contentType } });
+      } catch {
+        await prisma.propertyPhoto.delete({ where: { id: photo.id } });
+        throw new Error('Photo storage failed. Please retry.');
+      }
+    } else {
+      const photo = await prisma.unitPhoto.create({
+        data: { landlordId: opts.landlordId, unitId: opts.entityId, storageKey: '', fileName: file.name, contentType: file.type, fileSize: 0, uploadedBy: opts.userId, sortOrder: Date.now() + i },
+      });
+      const key = unitPhotoKey(opts.landlordId, opts.entityId, photo.id, file.name);
+      try {
+        const { size, contentType } = await putPhotoBlob(key, file);
+        await prisma.unitPhoto.update({ where: { id: photo.id }, data: { storageKey: key, fileSize: size, contentType } });
+      } catch {
+        await prisma.unitPhoto.delete({ where: { id: photo.id } });
+        throw new Error('Photo storage failed. Please retry.');
+      }
+    }
+  }
+  return valid.length;
+}
+
+export async function uploadPropertyPhotosAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const propertyId = requiredText(formData, 'propertyId');
+  await requireOwnedProperty(landlordId, propertyId);
+  const files = formData.getAll('photos').filter((v): v is File => v instanceof File);
+  if (files.length === 0) throw new Error('Select at least one image.');
+  const n = await uploadEntityPhotos({ files, landlordId, userId: user.userId, userEmail: user.email, kind: 'property', entityId: propertyId });
+  await audit(user.userId, user.email, 'property.photos_uploaded', 'Property', propertyId, landlordId, { count: n });
+  revalidatePath(`/properties/${propertyId}`);
+  revalidatePath('/properties');
+}
+
+export async function deletePropertyPhotoAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const photoId = requiredText(formData, 'photoId');
+  const photo = await prisma.propertyPhoto.findFirst({ where: { id: photoId, landlordId } });
+  if (!photo) throw new Error('Photo not found for this workspace.');
+  try { if (photo.storageKey) await deletePhotoBlob(photo.storageKey); } catch {}
+  await prisma.propertyPhoto.delete({ where: { id: photo.id } });
+  await audit(user.userId, user.email, 'property.photo_deleted', 'Property', photo.propertyId, landlordId, { photoId });
+  revalidatePath(`/properties/${photo.propertyId}`);
+  revalidatePath('/properties');
+}
+
+export async function setPrimaryPropertyPhotoAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const photoId = requiredText(formData, 'photoId');
+  const photo = await prisma.propertyPhoto.findFirst({ where: { id: photoId, landlordId } });
+  if (!photo) throw new Error('Photo not found for this workspace.');
+  await prisma.$transaction([
+    prisma.propertyPhoto.updateMany({ where: { propertyId: photo.propertyId }, data: { isPrimary: false } }),
+    prisma.propertyPhoto.update({ where: { id: photo.id }, data: { isPrimary: true } }),
+  ]);
+  await audit(user.userId, user.email, 'property.photo_primary_set', 'Property', photo.propertyId, landlordId, { photoId });
+  revalidatePath(`/properties/${photo.propertyId}`);
+  revalidatePath('/properties');
+}
+
+export async function uploadUnitPhotosAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const unitId = requiredText(formData, 'unitId');
+  await requireOwnedUnit(landlordId, unitId);
+  const files = formData.getAll('photos').filter((v): v is File => v instanceof File);
+  if (files.length === 0) throw new Error('Select at least one image.');
+  const n = await uploadEntityPhotos({ files, landlordId, userId: user.userId, userEmail: user.email, kind: 'unit', entityId: unitId });
+  await audit(user.userId, user.email, 'unit.photos_uploaded', 'Unit', unitId, landlordId, { count: n });
+  revalidatePath(`/units/${unitId}`);
+  revalidatePath('/units');
+}
+
+export async function deleteUnitPhotoAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const photoId = requiredText(formData, 'photoId');
+  const photo = await prisma.unitPhoto.findFirst({ where: { id: photoId, landlordId } });
+  if (!photo) throw new Error('Photo not found for this workspace.');
+  try { if (photo.storageKey) await deletePhotoBlob(photo.storageKey); } catch {}
+  await prisma.unitPhoto.delete({ where: { id: photo.id } });
+  await audit(user.userId, user.email, 'unit.photo_deleted', 'Unit', photo.unitId, landlordId, { photoId });
+  revalidatePath(`/units/${photo.unitId}`);
+  revalidatePath('/units');
+}
+
+export async function setPrimaryUnitPhotoAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const photoId = requiredText(formData, 'photoId');
+  const photo = await prisma.unitPhoto.findFirst({ where: { id: photoId, landlordId } });
+  if (!photo) throw new Error('Photo not found for this workspace.');
+  await prisma.$transaction([
+    prisma.unitPhoto.updateMany({ where: { unitId: photo.unitId }, data: { isPrimary: false } }),
+    prisma.unitPhoto.update({ where: { id: photo.id }, data: { isPrimary: true } }),
+  ]);
+  await audit(user.userId, user.email, 'unit.photo_primary_set', 'Unit', photo.unitId, landlordId, { photoId });
+  revalidatePath(`/units/${photo.unitId}`);
+  revalidatePath('/units');
 }
 
 export async function createInvoiceAction(formData: FormData) {

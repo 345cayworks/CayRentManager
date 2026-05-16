@@ -2,7 +2,7 @@ import { MaintenanceCategory, MaintenancePriority, UserRole } from '@prisma/clie
 import { Shell } from '@/components/shell';
 import { requireRole } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { createTenantMaintenanceRequestAction } from '@/server/actions';
+import { createTenantMaintenanceRequestAction, uploadMaintenanceAttachmentAction } from '@/server/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,6 +111,11 @@ export default async function Page() {
                         <td className="p-3">
                           <p className="font-medium">{request.title}</p>
                           <p className="text-sm text-slate-500">{request.property.name}{request.unit ? ` / ${request.unit.unitName}` : ''}</p>
+                          <form action={uploadMaintenanceAttachmentAction} encType="multipart/form-data" className="mt-2 flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="maintenanceRequestId" value={request.id} />
+                            <input required type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" className="rounded border px-2 py-1 text-xs" />
+                            <button className="rounded border px-3 py-1 text-xs">Upload photo/file</button>
+                          </form>
                         </td>
                         <td className="p-3">{request.category.replaceAll('_', ' ')}</td>
                         <td className="p-3">{request.priority}</td>

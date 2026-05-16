@@ -5,6 +5,7 @@ import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { archivePropertyAction, updatePropertyAction } from '@/server/actions';
+import { PhotoManager } from '@/components/photo-manager';
 import { getEffectiveTimezone } from '@/lib/time/effective';
 import { formatDate } from '@/lib/time/format';
 
@@ -44,6 +45,11 @@ export default async function Page({
   });
 
   if (!property) redirect('/unauthorized');
+
+  const propertyPhotos = await prisma.propertyPhoto.findMany({
+    where: { propertyId: property.id, archivedAt: null },
+    orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+  });
 
   const monthlyRentExpected = property.leases.reduce(
     (sum, lease) => sum + Number(lease.rentAmount),
@@ -179,6 +185,17 @@ export default async function Page({
             </form>
           </details>
         </section>
+
+        <PhotoManager
+          kind="property"
+          entityId={property.id}
+          photos={propertyPhotos.map((p) => ({
+            id: p.id,
+            fileName: p.fileName,
+            isPrimary: p.isPrimary,
+            contentType: p.contentType,
+          }))}
+        />
 
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="space-y-4">

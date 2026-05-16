@@ -107,6 +107,7 @@ Latest confirmed merged work includes:
 - Phase 8 reporting & accounting expansion (reports hub + 7 reports with date-range filters and CSV export; owner statements deferred)
 - Phase 9 tenant portal expansion (tenant lease view, payment history + balance, two-way landlord⇄tenant messaging with inbox/thread, unread badges; owner statements/attachments/email-SMS-of-messages/realtime deferred)
 - Landlord⇄Vendor messaging (generalized inbox for tenants AND portal-linked vendors, landlord vendor thread + vendor-portal thread, vendor mark-read + nav badge; schema-free); Phase 5.3 marketplace "Request a quote" now actually delivers (in-app message to a portal-linked workspace copy of the global vendor, else queued email via the Phase 6 outbox, lead always recorded)
+- Vendor Portal Governance (landlord direct-enable removed; landlords submit a `VendorPortalRequest`, superadmin approves/rejects or directly enables; one-pending-per-vendor partial unique; landlord can cancel pending + disable enabled; `/admin/vendor-portal` review console)
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -419,6 +420,7 @@ Note:
 /admin/users
 /admin/landlords
 /admin/vendors
+/admin/vendor-portal
 /admin/audit
 /admin/settings
 ```
@@ -889,6 +891,25 @@ Build:
 - vendor nav Messages link with resilient unread badge
 - Phase 5.3 marketplace "Request a quote" now delivers: in-app message when a portal-linked workspace copy of the global vendor exists, else queued email via the Phase 6 outbox; the `GlobalVendorLead` is always recorded (delivery is best-effort)
 - schema-free (Message is user↔user; `notificationKind` is free-text)
+
+---
+
+### Vendor Portal Governance
+
+Status:
+
+```text
+Complete
+```
+
+Build:
+
+- landlord direct-enable removed; landlords submit a `VendorPortalRequest` for vendors in their workspace
+- superadmin approves/rejects requests and can directly enable a portal for any workspace vendor (`/admin/vendor-portal` console + admin nav entry)
+- shared internal `linkVendorPortalUser` core preserves the exact user find/create + role/uniqueness checks
+- landlords may cancel their own pending request and still disable an enabled portal (safe de-escalation); `disableVendorPortalAction` now allows the owning landlord OR superadmin
+- request lifecycle PENDING → APPROVED/REJECTED/CANCELLED; partial unique index enforces one pending request per vendor
+- see `docs/VENDOR_PORTAL_GOVERNANCE.md`
 
 ---
 

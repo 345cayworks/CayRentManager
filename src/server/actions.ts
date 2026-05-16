@@ -1340,18 +1340,19 @@ export async function restoreMaintenanceVendorAction(formData: FormData) {
   revalidatePath('/maintenance/vendors');
 }
 
-export async function enableVendorPortalAction(formData: FormData) {
-  const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const vendorId = requiredText(formData, 'vendorId');
-  const vendor = await prisma.maintenanceVendor.findFirst({ where: { id: vendorId, landlordId } });
-  if (!vendor) throw new Error('Vendor not found for this workspace.');
-
-  const portalEmail = requiredText(formData, 'portalEmail').toLowerCase();
-
+/**
+ * Internal (not a server action). Finds-or-creates the portal `User` for a
+ * vendor and links it, preserving the exact role/uniqueness checks the old
+ * landlord-callable enable action had. Throws the same friendly errors.
+ */
+async function linkVendorPortalUser(
+  vendorId: string,
+  portalEmail: string,
+): Promise<{ portalUserId: string }> {
   let portalUser = await prisma.user.findUnique({ where: { email: portalEmail } });
   if (portalUser) {
     const otherVendor = await prisma.maintenanceVendor.findFirst({
-      where: { userId: portalUser.id, NOT: { id: vendor.id } },
+      where: { userId: portalUser.id, NOT: { id: vendorId } },
     });
     if (otherVendor) throw new Error('That email is already linked to another vendor.');
     if (
@@ -1373,23 +1374,155 @@ export async function enableVendorPortalAction(formData: FormData) {
   }
 
   await prisma.maintenanceVendor.update({
-    where: { id: vendor.id },
+    where: { id: vendorId },
     data: { userId: portalUser.id, portalEnabledAt: new Date() },
   });
-  await audit(user.userId, user.email, 'maintenance_vendor.portal_enabled', 'MaintenanceVendor', vendor.id, landlordId, { portalEmail });
+  return { portalUserId: portalUser.id };
+}
+
+export async function requestVendorPortalAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendorId = requiredText(formData, 'vendorId');
+  const vendor = await prisma.maintenanceVendor.findFirst({
+    where: { id: vendorId, landlordId, archivedAt: null },
+  });
+  if (!vendor) throw new Error('Vendor not found for this workspace.');
+  if (vendor.userId) throw new Error('Portal is already enabled for this vendor.');
+
+  const existingPending = await prisma.vendorPortalRequest.findFirst({
+    where: { maintenanceVendorId: vendor.id, status: 'PENDING' },
+  });
+  if (existingPending) throw new Error('A portal request is already pending for this vendor.');
+
+  const portalEmail = requiredText(formData, 'portalEmail').toLowerCase();
+  const note = (text(formData, 'note') || '').slice(0, 500) || null;
+
+  try {
+    await prisma.vendorPortalRequest.create({
+      data: {
+        landlordId,
+        maintenanceVendorId: vendor.id,
+        requestedByUserId: user.userId,
+        requestedEmail: portalEmail,
+        note,
+        status: 'PENDING',
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw new Error('A portal request is already pending for this vendor.');
+    }
+    throw err;
+  }
+  await audit(user.userId, user.email, 'vendor_portal_request.created', 'MaintenanceVendor', vendor.id, landlordId, { portalEmail });
   revalidatePath(`/maintenance/vendors/${vendor.id}`);
 }
 
-export async function disableVendorPortalAction(formData: FormData) {
+export async function cancelVendorPortalRequestAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
-  const vendorId = requiredText(formData, 'vendorId');
-  const result = await prisma.maintenanceVendor.updateMany({
-    where: { id: vendorId, landlordId },
-    data: { userId: null, portalEnabledAt: null },
+  const requestId = requiredText(formData, 'requestId');
+  const req = await prisma.vendorPortalRequest.findFirst({
+    where: { id: requestId, landlordId, status: 'PENDING' },
   });
-  assertSingleWorkspaceUpdate(result);
-  await audit(user.userId, user.email, 'maintenance_vendor.portal_disabled', 'MaintenanceVendor', vendorId, landlordId);
+  if (!req) throw new Error('Pending portal request not found for this workspace.');
+  await prisma.vendorPortalRequest.update({
+    where: { id: req.id },
+    data: { status: 'CANCELLED' },
+  });
+  await audit(user.userId, user.email, 'vendor_portal_request.cancelled', 'MaintenanceVendor', req.maintenanceVendorId, landlordId);
+  revalidatePath(`/maintenance/vendors/${req.maintenanceVendorId}`);
+}
+
+export async function approveVendorPortalRequestAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const requestId = requiredText(formData, 'requestId');
+  const req = await prisma.vendorPortalRequest.findFirst({
+    where: { id: requestId, status: 'PENDING' },
+    include: { vendor: true },
+  });
+  if (!req) throw new Error('Pending portal request not found.');
+
+  await linkVendorPortalUser(req.maintenanceVendorId, req.requestedEmail);
+  await prisma.vendorPortalRequest.update({
+    where: { id: req.id },
+    data: {
+      status: 'APPROVED',
+      reviewedByUserId: actor.userId,
+      reviewedAt: new Date(),
+      decisionNote: text(formData, 'decisionNote') || null,
+    },
+  });
+  await audit(actor.userId, actor.email, 'vendor_portal_request.approved', 'MaintenanceVendor', req.maintenanceVendorId, req.landlordId, { requestedEmail: req.requestedEmail });
+  revalidatePath('/admin/vendor-portal');
+  revalidatePath(`/maintenance/vendors/${req.maintenanceVendorId}`);
+}
+
+export async function rejectVendorPortalRequestAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const requestId = requiredText(formData, 'requestId');
+  const req = await prisma.vendorPortalRequest.findFirst({
+    where: { id: requestId, status: 'PENDING' },
+  });
+  if (!req) throw new Error('Pending portal request not found.');
+
+  await prisma.vendorPortalRequest.update({
+    where: { id: req.id },
+    data: {
+      status: 'REJECTED',
+      reviewedByUserId: actor.userId,
+      reviewedAt: new Date(),
+      decisionNote: text(formData, 'decisionNote') || null,
+    },
+  });
+  await audit(actor.userId, actor.email, 'vendor_portal_request.rejected', 'MaintenanceVendor', req.maintenanceVendorId, req.landlordId);
+  revalidatePath('/admin/vendor-portal');
+  revalidatePath(`/maintenance/vendors/${req.maintenanceVendorId}`);
+}
+
+export async function superadminEnableVendorPortalAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+  const vendorId = requiredText(formData, 'vendorId');
+  const vendor = await prisma.maintenanceVendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) throw new Error('Vendor not found.');
+  if (vendor.userId) throw new Error('Portal is already enabled for this vendor.');
+
+  const portalEmail = requiredText(formData, 'portalEmail').toLowerCase();
+  await linkVendorPortalUser(vendorId, portalEmail);
+  await audit(actor.userId, actor.email, 'maintenance_vendor.portal_enabled', 'MaintenanceVendor', vendorId, vendor.landlordId, { portalEmail, via: 'superadmin_direct' });
+  revalidatePath('/admin/vendor-portal');
   revalidatePath(`/maintenance/vendors/${vendorId}`);
+}
+
+export async function disableVendorPortalAction(formData: FormData) {
+  const user = await requireRole([
+    UserRole.LANDLORD,
+    UserRole.PROPERTY_MANAGER,
+    UserRole.ACCOUNTANT,
+    UserRole.SUPERADMIN,
+  ]);
+  const vendorId = requiredText(formData, 'vendorId');
+
+  let landlordId: string;
+  if (user.role === UserRole.SUPERADMIN) {
+    const vendor = await prisma.maintenanceVendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) throw new Error('Vendor not found.');
+    landlordId = vendor.landlordId;
+    await prisma.maintenanceVendor.update({
+      where: { id: vendorId },
+      data: { userId: null, portalEnabledAt: null },
+    });
+  } else {
+    const workspace = await getCurrentLandlordWorkspace();
+    landlordId = workspace.landlordId;
+    const result = await prisma.maintenanceVendor.updateMany({
+      where: { id: vendorId, landlordId },
+      data: { userId: null, portalEnabledAt: null },
+    });
+    assertSingleWorkspaceUpdate(result);
+  }
+  await audit(user.userId, user.email, 'maintenance_vendor.portal_disabled', 'MaintenanceVendor', vendorId, landlordId, { by: user.role });
+  revalidatePath(`/maintenance/vendors/${vendorId}`);
+  revalidatePath('/admin/vendor-portal');
 }
 
 export async function dispatchWorkOrderAction(formData: FormData) {

@@ -320,6 +320,7 @@ model LandlordProfile {
   escalationPolicy      EscalationPolicy?
   alertEscalations      AlertEscalation[]
   globalVendorLeads     GlobalVendorLead[]
+  vendorPortalRequests  VendorPortalRequest[]
 }
 
 model EscalationPolicy {
@@ -972,10 +973,33 @@ model MaintenanceVendor {
   globalVendor     GlobalVendor?          @relation(fields: [globalVendorId], references: [id])
   assignedRequests MaintenanceRequest[]
   workOrders       MaintenanceWorkOrder[]
+  portalRequests   VendorPortalRequest[]
 
   @@index([landlordId])
   @@index([landlordId, archivedAt])
   @@index([globalVendorId])
+}
+
+model VendorPortalRequest {
+  id                  String    @id @default(cuid())
+  landlordId          String
+  maintenanceVendorId String
+  requestedByUserId   String
+  requestedEmail      String
+  status              String    @default("PENDING") // PENDING|APPROVED|REJECTED|CANCELLED
+  note                String?
+  reviewedByUserId    String?
+  reviewedAt          DateTime?
+  decisionNote        String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  landlord LandlordProfile   @relation(fields: [landlordId], references: [id])
+  vendor   MaintenanceVendor @relation(fields: [maintenanceVendorId], references: [id])
+
+  @@index([status])
+  @@index([landlordId])
+  @@index([maintenanceVendorId])
 }
 
 model GlobalVendor {

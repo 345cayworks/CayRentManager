@@ -5,8 +5,9 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import {
   archiveMaintenanceVendorAction,
+  cancelVendorPortalRequestAction,
   disableVendorPortalAction,
-  enableVendorPortalAction,
+  requestVendorPortalAction,
   restoreMaintenanceVendorAction,
   updateMaintenanceVendorAction,
 } from '@/server/actions';
@@ -62,6 +63,13 @@ export default async function VendorDetailPage({ params }: { params: { vendorId:
 
   const archived = vendor.archivedAt !== null;
   const portalEnabled = vendor.userId !== null;
+
+  const latestRequest = await prisma.vendorPortalRequest.findFirst({
+    where: { maintenanceVendorId: vendor.id },
+    orderBy: { createdAt: 'desc' },
+  });
+  const pendingRequest =
+    latestRequest && latestRequest.status === 'PENDING' ? latestRequest : null;
 
   return (
     <Shell title="Vendor Detail">
@@ -230,18 +238,57 @@ export default async function VendorDetailPage({ params }: { params: { vendorId:
                   </button>
                 </form>
               </div>
-            ) : (
-              <form action={enableVendorPortalAction} className="mt-3 grid gap-3">
-                <input type="hidden" name="vendorId" value={vendor.id} />
-                <label className="grid gap-1 text-sm">
-                  <span className="text-slate-600">Portal email</span>
-                  <input required name="portalEmail" type="email" className="rounded border px-3 py-2" />
-                </label>
-                <button className="rounded bg-brand-navy px-4 py-2 text-white text-sm">Enable portal</button>
-                <p className="text-xs text-slate-500">
-                  Creates or links a vendor login. The user will receive an invite and must set a password before signing in.
+            ) : pendingRequest ? (
+              <div className="mt-3 space-y-3 text-sm">
+                <p className="text-slate-700">
+                  Portal access requested {formatDate(pendingRequest.createdAt, tz)} — awaiting
+                  superadmin review.
                 </p>
-              </form>
+                <p className="text-xs text-slate-500">
+                  Requested email:{' '}
+                  <span className="font-medium">{pendingRequest.requestedEmail}</span>
+                </p>
+                {pendingRequest.note ? (
+                  <p className="text-xs text-slate-500">Note: {pendingRequest.note}</p>
+                ) : null}
+                <form action={cancelVendorPortalRequestAction}>
+                  <input type="hidden" name="requestId" value={pendingRequest.id} />
+                  <button className="rounded border px-4 py-2 text-sm font-medium hover:bg-slate-50">
+                    Cancel request
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {latestRequest && latestRequest.status === 'REJECTED' ? (
+                  <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    <p className="font-medium">
+                      Previous request rejected {formatDate(latestRequest.createdAt, tz)}.
+                    </p>
+                    {latestRequest.decisionNote ? (
+                      <p className="mt-1">Reason: {latestRequest.decisionNote}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                <form action={requestVendorPortalAction} className="grid gap-3">
+                  <input type="hidden" name="vendorId" value={vendor.id} />
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-slate-600">Portal email</span>
+                    <input required name="portalEmail" type="email" className="rounded border px-3 py-2" />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-slate-600">Note (optional)</span>
+                    <textarea name="note" rows={2} maxLength={500} className="rounded border px-3 py-2" />
+                  </label>
+                  <button className="rounded bg-brand-navy px-4 py-2 text-white text-sm">
+                    Request portal access
+                  </button>
+                  <p className="text-xs text-slate-500">
+                    Submits a request for a superadmin to review. They will create or link
+                    the vendor login on approval.
+                  </p>
+                </form>
+              </div>
             )}
           </section>
 

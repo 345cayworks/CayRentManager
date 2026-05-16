@@ -6,6 +6,7 @@ import {
   addGlobalVendorToWorkspaceAction,
   archiveMaintenanceVendorAction,
   createMaintenanceVendorAction,
+  recordGlobalVendorInquiryAction,
   restoreMaintenanceVendorAction,
 } from '@/server/actions';
 import { getEffectiveTimezone } from '@/lib/time/effective';
@@ -376,9 +377,9 @@ export default async function VendorsPage({
                     <p className="mt-2 text-sm text-slate-600">{vendor.website}</p>
                   ) : null}
 
-                  <div className="mt-4">
+                  <div className="mt-4 flex flex-col gap-2">
                     {added ? (
-                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                      <span className="inline-flex w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
                         Added ✓
                       </span>
                     ) : (
@@ -389,6 +390,24 @@ export default async function VendorsPage({
                         </button>
                       </form>
                     )}
+                    <details className="text-xs text-slate-600">
+                      <summary className="cursor-pointer text-brand-navy hover:underline">
+                        Request a quote
+                      </summary>
+                      <form action={recordGlobalVendorInquiryAction} className="mt-2 flex flex-col gap-2">
+                        <input type="hidden" name="globalVendorId" value={vendor.id} />
+                        <textarea
+                          name="note"
+                          maxLength={500}
+                          rows={2}
+                          placeholder="What do you need?"
+                          className="border rounded px-2 py-1"
+                        />
+                        <button className="w-fit rounded border px-3 py-1 font-medium hover:bg-slate-50">
+                          Send inquiry
+                        </button>
+                      </form>
+                    </details>
                   </div>
                 </div>
               );

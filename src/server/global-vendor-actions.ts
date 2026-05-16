@@ -5,6 +5,7 @@ import { Prisma, RecordStatus } from '@prisma/client';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { normalizeVendorFlags, parseMonthlyFee } from '@/lib/vendors/global-vendor';
+import { isBillingStatus } from '@/lib/vendors/monetization';
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
@@ -154,6 +155,52 @@ export async function setGlobalVendorFlagsAction(formData: FormData) {
     approvedStatus: flags.approvedStatus,
     featured: flags.featured,
     sponsored: flags.sponsored,
+  });
+
+  revalidatePath('/admin/vendors');
+}
+
+export async function updateGlobalVendorBillingAction(formData: FormData) {
+  const actor = await requireSuperadmin();
+
+  const vendorId = requiredText(formData, 'vendorId', 'Vendor id');
+  const existing = await prisma.globalVendor.findUnique({ where: { id: vendorId } });
+  if (!existing) throw new Error('Global vendor not found.');
+
+  const billingStatus = requiredText(formData, 'billingStatus', 'Billing status');
+  if (!isBillingStatus(billingStatus)) {
+    throw new Error('Invalid billing status.');
+  }
+
+  const fee = parseMonthlyFee(text(formData, 'monthlyFee'));
+  const monthlyFee = fee === null ? null : new Prisma.Decimal(fee);
+
+  const paidThroughRaw = text(formData, 'paidThrough');
+  let paidThrough: Date | null = null;
+  if (paidThroughRaw.length > 0) {
+    const parsed = new Date(paidThroughRaw);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error('Paid-through date is invalid.');
+    }
+    paidThrough = parsed;
+  }
+
+  const notesRaw = text(formData, 'billingNotes');
+  const billingNotes = notesRaw.length > 0 ? notesRaw.slice(0, 1000) : null;
+
+  await prisma.globalVendor.update({
+    where: { id: vendorId },
+    data: {
+      billingStatus,
+      monthlyFee,
+      paidThrough,
+      billingNotes,
+    },
+  });
+
+  await audit(actor.userId, actor.email, 'global_vendor.billing_updated', vendorId, {
+    billingStatus,
+    monthlyFee: fee,
   });
 
   revalidatePath('/admin/vendors');

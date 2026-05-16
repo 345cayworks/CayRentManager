@@ -581,8 +581,33 @@ export async function addGlobalVendorToWorkspaceAction(formData: FormData) {
   }
 
   await audit(user.userId, user.email, 'maintenance_vendor.added_from_global', 'MaintenanceVendor', created.id, landlordId, { globalVendorId });
+  try {
+    await prisma.globalVendorLead.create({ data: { globalVendorId, landlordId, type: 'ADD_TO_LIST' } });
+  } catch {
+    /* lead tracking is best-effort */
+  }
   revalidatePath('/maintenance/vendors');
   revalidatePath('/maintenance');
+}
+
+export async function recordGlobalVendorInquiryAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const globalVendorId = requiredText(formData, 'globalVendorId');
+  const rawNote = text(formData, 'note');
+  const note = rawNote ? rawNote.slice(0, 500) : '';
+
+  const gv = await prisma.globalVendor.findFirst({
+    where: { id: globalVendorId, status: 'ACTIVE', approvedStatus: true },
+  });
+  if (!gv) throw new Error('Vendor is not available.');
+
+  await prisma.globalVendorLead.create({
+    data: { globalVendorId, landlordId, type: 'INQUIRY', note: note || null },
+  });
+
+  await audit(user.userId, user.email, 'global_vendor.inquiry', 'GlobalVendor', globalVendorId, landlordId, { note: !!note });
+  // Notification wiring through the Phase 6 outbox is deferred (out of scope).
+  revalidatePath('/maintenance/vendors');
 }
 
 export async function assignMaintenanceVendorAction(formData: FormData) {

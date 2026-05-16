@@ -104,6 +104,7 @@ Latest confirmed merged work includes:
 - password visibility toggles
 - Phase 7 real upload infrastructure (Netlify Blobs)
 - Property & Unit Photos (galleries, primary photo, list thumbnails, secure image endpoints)
+- Phase 8 reporting & accounting expansion (reports hub + 7 reports with date-range filters and CSV export; owner statements deferred)
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -436,6 +437,15 @@ Note:
 /expenses
 /documents
 /reports
+/reports/tenant-balances
+/reports/payment-history
+/reports/expenses
+/reports/property-pl
+/reports/cashflow
+/reports/maintenance-costs
+/reports/lease-expiry
+/financials
+/financials/rent-roll
 ```
 
 ### Tenant Routes
@@ -796,6 +806,12 @@ Implemented:
 ---
 
 ## Phase 8 — Reporting & Accounting Expansion
+
+Status:
+
+```text
+Complete (owner statements deferred)
+```
 
 Priority:
 

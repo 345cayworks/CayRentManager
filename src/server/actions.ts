@@ -1599,6 +1599,36 @@ export async function updatePlatformSettingsAction(formData: FormData) {
   revalidatePath('/', 'layout');
 }
 
+export async function updatePlatformEscalationDefaultsAction(formData: FormData) {
+  const user = await requireSuperadmin();
+  const enabled = String(formData.get('enabled') ?? '') === 'on';
+  const minSeverity = requiredText(formData, 'minSeverity');
+  if (!['INFO', 'WARNING', 'URGENT', 'CRITICAL'].includes(minSeverity)) {
+    throw new Error('Invalid minimum severity.');
+  }
+  const thresholdHours = Number(requiredText(formData, 'thresholdHours'));
+  if (!Number.isInteger(thresholdHours) || thresholdHours < 1 || thresholdHours > 720) {
+    throw new Error('Threshold hours must be a whole number between 1 and 720.');
+  }
+  await setPlatformSetting('escalationEnabled', enabled ? 'true' : 'false', user.userId);
+  await setPlatformSetting('escalationMinSeverity', minSeverity, user.userId);
+  await setPlatformSetting(
+    'escalationThresholdHours',
+    String(thresholdHours),
+    user.userId,
+  );
+  await audit(
+    user.userId,
+    user.email,
+    'platform.escalation_updated',
+    'SystemSetting',
+    'platform.escalation',
+    undefined,
+    { enabled, minSeverity, thresholdHours },
+  );
+  revalidatePath('/admin/settings');
+}
+
 export async function updateWorkspaceTimePrefsAction(formData: FormData) {
   const { user, landlordId } = await getCurrentLandlordWorkspace();
   const timezone = requiredText(formData, 'timezone');

@@ -59,6 +59,12 @@ async function AlertsSection({
     take: status === 'ACTIVE' ? 50 : 20,
   });
 
+  const escalations = await prisma.alertEscalation.findMany({
+    where: { landlordId, alertKey: { in: alerts.map((a) => a.alertKey) } },
+    select: { alertKey: true },
+  });
+  const escalatedKeys = new Set(escalations.map((e) => e.alertKey));
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
@@ -91,6 +97,12 @@ async function AlertsSection({
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
                       {alert.type.replaceAll('_', ' ')}
                     </span>
+
+                    {escalatedKeys.has(alert.alertKey) ? (
+                      <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
+                        Escalated
+                      </span>
+                    ) : null}
                   </div>
 
                   <div>

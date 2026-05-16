@@ -317,6 +317,40 @@ model LandlordProfile {
   subscriptionInvoices  SubscriptionInvoice[]
   alertPreferences      AlertPreference[]
   outboundNotifications OutboundNotification[]
+  escalationPolicy      EscalationPolicy?
+  alertEscalations      AlertEscalation[]
+}
+
+model EscalationPolicy {
+  id             String   @id @default(cuid())
+  landlordId     String   @unique
+  enabled        Boolean  @default(true)
+  minSeverity    String   @default("URGENT")
+  thresholdHours Int      @default(24)
+  repeatHours    Int?
+  notifyRoles    String[] @default(["LANDLORD", "PROPERTY_MANAGER"])
+  channels       String[] @default(["EMAIL"])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  updatedBy      String?
+
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+}
+
+model AlertEscalation {
+  id              String   @id @default(cuid())
+  landlordId      String
+  alertKey        String
+  level           Int
+  severity        String
+  notifiedUserIds String[] @default([])
+  channels        String[] @default([])
+  sentAt          DateTime @default(now())
+
+  landlord LandlordProfile @relation(fields: [landlordId], references: [id])
+
+  @@unique([landlordId, alertKey, level])
+  @@index([landlordId, alertKey])
 }
 
 model SystemSetting {
@@ -1037,6 +1071,7 @@ enum NotificationStatus {
 enum NotificationChannel {
   EMAIL
   SMS
+  WHATSAPP
 }
 
 model AlertPreference {
@@ -1061,6 +1096,8 @@ model OutboundNotification {
   landlordId        String?
   recipientUserId   String?
   recipientEmail    String
+  recipientPhone    String?
+  notificationKind  String              @default("GENERAL")
   channel           NotificationChannel @default(EMAIL)
   subject           String
   body              String              @db.Text

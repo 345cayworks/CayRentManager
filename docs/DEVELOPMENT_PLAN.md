@@ -93,6 +93,7 @@ Latest confirmed merged work includes:
 
 - Phase 3 sprint closeout (vendor management, dispatch workflow, SLA tracking, vendor portal)
 - Phase 4 alert center and alert automation foundation
+- Phase 6 notification infrastructure closeout (alert escalation engine + team-member resolution; SMS/WhatsApp channel abstraction)
 - document vault foundation
 - registration workflow tightening
 - professional onboarding page
@@ -251,6 +252,7 @@ Implemented:
 - alert badges in landlord navigation
 - per-user alert preferences at `/account/notifications` (digest on/off, minimum severity, suppressed types)
 - daily digest scheduled function (`alert-digest-daily.ts`)
+- hourly escalation scan scheduled function (`alert-escalation-scan.ts`)
 - notification outbox + log-only default driver + Resend driver behind env
 
 Alert lifecycle:
@@ -267,7 +269,7 @@ PENDING → SENT / FAILED / SKIPPED
 
 Deferred to later phases:
 
-- escalation routing (needs a rules engine + team-member resolution)
+- escalation routing — DONE in Phase 6 (rules engine + team-member resolution by membership role); see `docs/PHASE6_NOTIFICATION_COMPLETION.md`
 - concierge assignment (blocked on the concierge role rollout in Phase 5+)
 
 ---
@@ -705,6 +707,12 @@ Build:
 
 ## Phase 6 — Notification Infrastructure
 
+Status:
+
+```text
+Complete
+```
+
 Priority:
 
 ```text
@@ -718,8 +726,10 @@ Build:
 - notification preferences
 - daily digest framework
 - email abstraction
-- SMS/WhatsApp-ready abstraction
-- escalation rules
+- SMS/WhatsApp-ready abstraction — DONE: channel driver registry (EMAIL Resend/log, SMS + WhatsApp Twilio/log via `fetch`), `recipientPhone` routing
+- escalation rules — DONE: per-workspace `EscalationPolicy` with platform defaults, pure unit-tested evaluator (threshold + severity gate + repeat cadence + idempotent levels), team-member resolution by membership role, hourly `alert-escalation-scan.ts`
+
+See `docs/PHASE6_NOTIFICATION_COMPLETION.md` for the escalation model, level math, channel/env matrix, and skipped notes.
 
 ---
 

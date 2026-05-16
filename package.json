@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.7",
     "@netlify/database": "^1.0.0",
     "@netlify/identity": "^1.1.0",
     "@prisma/client": "^5.16.1",

@@ -15,6 +15,8 @@ import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 import { calculatePaymentBalance, calculatePaymentStatus, validatePaymentDates } from '@/lib/validation/payments';
 import { isSupportedCurrency, isSupportedTimezone } from '@/lib/time/format';
 import { setPlatformSetting } from '@/lib/settings/platform';
+import { maintenanceAttachmentKey, putMaintenanceBlob } from '@/lib/storage/blobs';
+import { validateUploadFile } from '@/lib/storage/validate';
 
 const operationalRoles: UserRole[] = [
   UserRole.VENDOR,
@@ -424,6 +426,62 @@ export async function addMaintenanceAttachmentAction(formData: FormData) {
   await audit(user.userId, user.email, 'maintenance.attachment_added', 'MaintenanceAttachment', attachment.id, request.landlordId, { maintenanceRequestId });
   revalidatePath('/tenant/maintenance');
   revalidatePath('/maintenance');
+}
+
+export async function uploadMaintenanceAttachmentAction(formData: FormData) {
+  const user = await requireRole([UserRole.TENANT, UserRole.LANDLORD, UserRole.PROPERTY_MANAGER, UserRole.SUPERADMIN]);
+  const maintenanceRequestId = requiredText(formData, 'maintenanceRequestId');
+  const request = await prisma.maintenanceRequest.findFirst({
+    where: user.role === UserRole.TENANT
+      ? { id: maintenanceRequestId, tenant: { userId: user.userId } }
+      : { id: maintenanceRequestId },
+  });
+  if (!request) throw new Error('Maintenance request not found.');
+
+  if (user.role !== UserRole.TENANT && user.role !== UserRole.SUPERADMIN) {
+    await requireOwnedProperty(request.landlordId, request.propertyId);
+  }
+
+  const fileValue = formData.get('file');
+  if (!(fileValue instanceof File) || fileValue.size === 0) {
+    throw new Error('Please select a file to upload.');
+  }
+  validateUploadFile(fileValue);
+
+  const attachment = await prisma.maintenanceAttachment.create({
+    data: {
+      maintenanceRequestId,
+      landlordId: request.landlordId,
+      uploadedBy: user.userId,
+      fileUrl: null,
+      fileType: fileValue.type,
+    },
+  });
+
+  const key = maintenanceAttachmentKey(request.landlordId, request.id, attachment.id, fileValue.name);
+
+  let size: number;
+  try {
+    const result = await putMaintenanceBlob(key, fileValue);
+    size = result.size;
+  } catch (error) {
+    await prisma.maintenanceAttachment.delete({ where: { id: attachment.id } });
+    throw new Error(
+      `Upload failed — the file could not be stored, so no record was kept. ${
+        error instanceof Error ? error.message : 'Unknown storage error.'
+      }`,
+    );
+  }
+
+  await prisma.maintenanceAttachment.update({
+    where: { id: attachment.id },
+    data: { storageKey: key, fileSize: size, fileType: fileValue.type },
+  });
+
+  await audit(user.userId, user.email, 'maintenance.attachment_uploaded', 'MaintenanceAttachment', attachment.id, request.landlordId, { maintenanceRequestId, fileSize: size });
+  revalidatePath('/tenant/maintenance');
+  revalidatePath('/maintenance');
+  revalidatePath(`/maintenance/${maintenanceRequestId}`);
 }
 
 export async function addMaintenanceCommentAction(formData: FormData) {

@@ -36,6 +36,17 @@ enum RecordStatus {
   INACTIVE
 }
 
+enum DocumentVisibility {
+  LANDLORD_ONLY
+  TENANT_VISIBLE
+}
+
+enum DocumentSource {
+  EXTERNAL
+  STORED
+  BROKEN_PLACEHOLDER
+}
+
 enum LeaseStatus {
   DRAFT
   ACTIVE
@@ -833,8 +844,12 @@ model MaintenanceRequest {
 model MaintenanceAttachment {
   id                   String   @id @default(cuid())
   maintenanceRequestId String
-  fileUrl              String
+  landlordId           String?
+  fileUrl              String?
+  storageKey           String?
+  fileSize             Int?
   fileType             String?
+  uploadedBy           String?
   uploadedAt           DateTime @default(now())
 
   maintenanceRequest MaintenanceRequest @relation(fields: [maintenanceRequestId], references: [id], onDelete: Cascade)
@@ -909,7 +924,7 @@ model MaintenanceWorkOrder {
 }
 
 model Document {
-  id           String       @id @default(cuid())
+  id           String             @id @default(cuid())
   landlordId   String
   propertyId   String?
   unitId       String?
@@ -918,9 +933,14 @@ model Document {
   documentType String
   fileName     String
   fileUrl      String
-  status       RecordStatus @default(ACTIVE)
+  storageKey   String?
+  fileSize     Int?
+  contentType  String?
+  visibility   DocumentVisibility @default(LANDLORD_ONLY)
+  source       DocumentSource     @default(EXTERNAL)
+  status       RecordStatus       @default(ACTIVE)
   uploadedBy   String
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime           @default(now())
   archivedAt   DateTime?
   archivedBy   String?
 

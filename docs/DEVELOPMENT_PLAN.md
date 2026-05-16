@@ -98,6 +98,7 @@ Latest confirmed merged work includes:
 - professional onboarding page
 - auth input readability fix
 - password visibility toggles
+- Phase 7 real upload infrastructure (Netlify Blobs)
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -275,7 +276,7 @@ Deferred to later phases:
 Status:
 
 ```text
-Foundation complete / upload-ready
+Complete
 ```
 
 Implemented:
@@ -284,10 +285,15 @@ Implemented:
 - document metadata workflow
 - document archive workflow
 - document association to property/unit/tenant/lease
-- upload-ready validation layer
+- upload validation layer
 - supported file types
-- pending-upload state
 - external document URL support
+- install and commit `@netlify/blobs`
+- real binary upload to Netlify Blobs
+- secure download endpoint
+- image/PDF preview
+- document visibility rules
+- tenant-visible documents
 
 Supported upload types in validation layer:
 
@@ -298,18 +304,13 @@ PDF, JPG, PNG, WEBP, DOC, DOCX
 Current storage state:
 
 ```text
-External URLs + upload-ready placeholders
+Netlify Blobs (stored) + external URLs + flagged broken placeholders
 ```
 
-Remaining:
+Deferred:
 
-- install and commit `@netlify/blobs`
-- real binary upload to Netlify Blobs or Cloudinary/S3/R2
-- secure download endpoint
-- image/PDF preview
-- document visibility rules
-- tenant-visible documents
-- compliance expiry alerts
+- compliance expiry alerts — belongs to the alert engine (tracked under the
+  alert automation roadmap, not document storage)
 
 ---
 
@@ -435,6 +436,14 @@ Note:
 ```text
 /tenant/dashboard
 /tenant/maintenance
+/tenant/documents
+```
+
+### Secure Download API Routes
+
+```text
+/api/documents/[documentId]/download
+/api/maintenance/attachments/[attachmentId]/download
 ```
 
 ---
@@ -710,21 +719,27 @@ Build:
 
 ## Phase 7 — Real Upload Infrastructure
 
-Priority:
+Status:
 
 ```text
-High
+Complete
 ```
 
-Build:
+Implemented:
 
-- install and commit `@netlify/blobs`
-- server-side upload helper
-- secure blob keys
-- document download endpoint
-- preview support
-- maintenance photo uploads
-- tenant document uploads
+- `@netlify/blobs` installed and committed
+- blob storage helpers (`src/lib/storage/blobs.ts`) with sanitized,
+  workspace-scoped keys for documents and maintenance attachments
+- real document binary upload (`uploadDocumentAction`) replacing the
+  data-losing `pending-blob-upload://` placeholder
+- secure auth-scoped document download endpoint with a pure, unit-tested
+  access-control decision function (`canAccessDocument`)
+- real maintenance photo/attachment uploads + secure download endpoint
+- document visibility rules (LANDLORD_ONLY / TENANT_VISIBLE)
+- real tenant document portal (`/tenant/documents`) + tenant nav entry
+- broken-placeholder remediation: migration backfills legacy placeholder
+  rows to `BROKEN_PLACEHOLDER`, UI flags them, hard-delete remediation action
+- image/PDF inline preview vs. attachment download
 
 ---
 

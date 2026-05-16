@@ -41,6 +41,7 @@ const baseLandlordLinks: NavLink[] = [
 const tenantLinks: NavLink[] = [
   { href: '/tenant/dashboard', label: 'Dashboard' },
   { href: '/tenant/maintenance', label: 'Maintenance' },
+  { href: '/tenant/documents', label: 'Documents' },
   { href: '/account/profile', label: 'Profile' },
 ];
 

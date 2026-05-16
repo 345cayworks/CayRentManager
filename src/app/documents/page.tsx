@@ -1,12 +1,13 @@
 import Link from 'next/link';
-import { RecordStatus } from '@prisma/client';
+import { DocumentSource, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import {
   archiveDocumentAction,
   createDocumentAction,
-  createUploadedDocumentPlaceholderAction,
+  deleteBrokenPlaceholderAction,
+  uploadDocumentAction,
 } from '@/server/document-actions';
 
 const documentTypes = [
@@ -32,6 +33,15 @@ function statusBadge(status: string) {
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${styles[status] ?? 'bg-slate-100 text-slate-700'}`}>
       {status}
     </span>
+  );
+}
+
+function VisibilityCheckbox() {
+  return (
+    <label className="flex items-start gap-2 text-sm text-slate-700 xl:col-span-2">
+      <input type="checkbox" name="visibility" value="tenant" className="mt-1" />
+      <span>Visible to the linked tenant (only applies if a tenant is selected)</span>
+    </label>
   );
 }
 
@@ -87,6 +97,8 @@ function UploadAssociationFields({
           ))}
         </select>
       </div>
+
+      <VisibilityCheckbox />
     </>
   );
 }
@@ -113,6 +125,7 @@ export default async function Page() {
 
   const activeDocuments = documents.filter((doc) => doc.status === RecordStatus.ACTIVE);
   const archivedDocuments = documents.filter((doc) => doc.status === RecordStatus.ARCHIVED);
+  const brokenCount = documents.filter((doc) => doc.source === DocumentSource.BROKEN_PLACEHOLDER).length;
 
   return (
     <Shell title="Document Vault">
@@ -139,6 +152,13 @@ export default async function Page() {
             </div>
           </div>
         </section>
+
+        {brokenCount > 0 ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+            {brokenCount} document record(s) reference files that were never stored. They are flagged
+            below — please re-upload and remove the broken records.
+          </div>
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -176,11 +196,11 @@ export default async function Page() {
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-slate-900">Direct Upload (Upload-Ready)</h2>
-              <p className="mt-2 text-sm text-slate-500">Blob storage integration scaffolded. Secure storage activation next.</p>
+              <h2 className="text-2xl font-semibold text-slate-900">Upload Document</h2>
+              <p className="mt-2 text-sm text-slate-500">Files are stored securely in Netlify Blobs.</p>
             </div>
 
-            <form action={createUploadedDocumentPlaceholderAction} className="grid gap-4">
+            <form action={uploadDocumentAction} encType="multipart/form-data" className="grid gap-4">
               <div>
                 <label className="text-sm font-medium text-slate-700">Document Type</label>
                 <select required name="documentType" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3">
@@ -198,7 +218,7 @@ export default async function Page() {
               <UploadAssociationFields properties={properties} units={units} tenants={tenants} leases={leases} />
 
               <button type="submit" className="rounded-2xl bg-cyan-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-cyan-500">
-                Create Upload Record
+                Upload Document
               </button>
             </form>
           </div>
@@ -215,7 +235,10 @@ export default async function Page() {
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
               {activeDocuments.map((document) => {
-                const isPendingUpload = document.fileUrl.startsWith('pending-blob-upload://');
+                const isStored = document.source === DocumentSource.STORED;
+                const isBroken = document.source === DocumentSource.BROKEN_PLACEHOLDER;
+                const isImage = document.contentType?.startsWith('image/') ?? false;
+                const downloadHref = `/api/documents/${document.id}/download`;
 
                 return (
                   <div key={document.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -224,7 +247,9 @@ export default async function Page() {
                         <div className="flex flex-wrap items-center gap-2">
                           {statusBadge(document.status)}
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{document.documentType.replaceAll('_', ' ')}</span>
-                          {isPendingUpload ? <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-medium text-cyan-700">Upload Pending</span> : null}
+                          {document.visibility === 'TENANT_VISIBLE' ? (
+                            <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">Tenant visible</span>
+                          ) : null}
                         </div>
 
                         <h3 className="mt-4 text-lg font-semibold text-slate-900">{document.fileName}</h3>
@@ -234,19 +259,42 @@ export default async function Page() {
                           {document.unit ? <p>Unit: {document.unit.unitName}</p> : null}
                           {document.tenant ? <p>Tenant: {document.tenant.fullName}</p> : null}
                         </div>
+
+                        {isStored && isImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={downloadHref} alt={document.fileName} className="mt-3 h-24 rounded-lg border border-slate-200 object-cover" />
+                        ) : null}
+
+                        {isBroken ? (
+                          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            File missing — never stored. Re-upload required.
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="flex flex-col gap-2">
-                        {isPendingUpload ? (
-                          <span className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-center text-sm font-medium text-cyan-700">Pending</span>
-                        ) : (
-                          <Link href={document.fileUrl} target="_blank" className="rounded-xl border border-slate-200 px-4 py-2 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50">Open</Link>
-                        )}
+                        {isStored ? (
+                          <>
+                            <Link href={downloadHref} target="_blank" className="rounded-xl border border-slate-200 px-4 py-2 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50">Preview</Link>
+                            <Link href={`${downloadHref}?download=1`} className="rounded-xl border border-slate-200 px-4 py-2 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50">Download</Link>
+                          </>
+                        ) : null}
 
-                        <form action={archiveDocumentAction}>
-                          <input type="hidden" name="documentId" value={document.id} />
-                          <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Archive</button>
-                        </form>
+                        {document.source === DocumentSource.EXTERNAL ? (
+                          <Link href={document.fileUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-200 px-4 py-2 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50">Open</Link>
+                        ) : null}
+
+                        {isBroken ? (
+                          <form action={deleteBrokenPlaceholderAction}>
+                            <input type="hidden" name="documentId" value={document.id} />
+                            <button type="submit" className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500">Remove record</button>
+                          </form>
+                        ) : (
+                          <form action={archiveDocumentAction}>
+                            <input type="hidden" name="documentId" value={document.id} />
+                            <button type="submit" className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Archive</button>
+                          </form>
+                        )}
                       </div>
                     </div>
                   </div>

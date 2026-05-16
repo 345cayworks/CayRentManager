@@ -6,6 +6,7 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import {
   addMaintenanceAttachmentAction,
+  uploadMaintenanceAttachmentAction,
   addMaintenanceCommentAction,
   assignMaintenanceVendorAction,
   createMaintenanceWorkOrderAction,
@@ -138,19 +139,29 @@ export default async function Page({ params }: { params: { maintenanceId: string
             <h3 className="font-semibold">Attachments</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {request.attachments.length === 0 ? <p className="text-sm text-slate-500">No attachments yet.</p> : null}
-              {request.attachments.map((attachment) => (
-                <a key={attachment.id} href={attachment.fileUrl} target="_blank" rel="noreferrer" className="rounded-xl border bg-slate-50 p-4 text-sm hover:bg-slate-100">
-                  <p className="font-medium">{attachment.fileType || 'Attachment'}</p>
-                  <p className="mt-1 truncate text-slate-500">{attachment.fileUrl}</p>
-                  <p className="mt-2 text-xs text-slate-400">Uploaded {formatDate(attachment.uploadedAt, tz)}</p>
-                </a>
-              ))}
+              {request.attachments.map((attachment) => {
+                const href = attachment.storageKey
+                  ? `/api/maintenance/attachments/${attachment.id}/download`
+                  : attachment.fileUrl ?? '#';
+                return (
+                  <a key={attachment.id} href={href} target="_blank" rel="noreferrer" className="rounded-xl border bg-slate-50 p-4 text-sm hover:bg-slate-100">
+                    <p className="font-medium">{attachment.fileType || 'Attachment'}</p>
+                    <p className="mt-1 truncate text-slate-500">{attachment.storageKey ? 'Stored file' : attachment.fileUrl}</p>
+                    <p className="mt-2 text-xs text-slate-400">Uploaded {formatDate(attachment.uploadedAt, tz)}</p>
+                  </a>
+                );
+              })}
             </div>
-            <form action={addMaintenanceAttachmentAction} className="mt-5 grid gap-3 md:grid-cols-[1fr_160px_auto]">
+            <form action={uploadMaintenanceAttachmentAction} encType="multipart/form-data" className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
               <input type="hidden" name="maintenanceRequestId" value={request.id} />
-              <input required name="fileUrl" placeholder="Attachment URL" className="rounded border px-3 py-2" />
+              <input required type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" className="rounded border px-3 py-2 text-sm" />
+              <button className="rounded border px-4 py-2">Upload file</button>
+            </form>
+            <form action={addMaintenanceAttachmentAction} className="mt-3 grid gap-3 md:grid-cols-[1fr_160px_auto]">
+              <input type="hidden" name="maintenanceRequestId" value={request.id} />
+              <input required name="fileUrl" placeholder="Or attach an external URL" className="rounded border px-3 py-2" />
               <input name="fileType" placeholder="Type" className="rounded border px-3 py-2" />
-              <button className="rounded border px-4 py-2">Add file</button>
+              <button className="rounded border px-4 py-2">Add link</button>
             </form>
           </section>
 

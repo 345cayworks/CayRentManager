@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { LeaseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PaymentMethodType, PaymentStatus, RecordStatus, UserRole, UserStatus, WorkOrderStatus } from '@prisma/client';
+import { LeaseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PaymentMethodType, PaymentStatus, Prisma, RecordStatus, UserRole, UserStatus, WorkOrderStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { getCurrentLandlordWorkspace, requireAuthAllowPasswordChange, requireRole, requireSuperadmin, requireVendorUser } from '@/lib/auth/guards';
 import { requireOwnedLease, requireOwnedProperty, requireOwnedTenant, requireOwnedUnit } from '@/lib/auth/ownership';
@@ -540,6 +540,47 @@ export async function createMaintenanceVendorAction(formData: FormData) {
     },
   });
   await audit(user.userId, user.email, 'maintenance_vendor.created', 'MaintenanceVendor', vendor.id, landlordId);
+  revalidatePath('/maintenance/vendors');
+  revalidatePath('/maintenance');
+}
+
+export async function addGlobalVendorToWorkspaceAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const globalVendorId = requiredText(formData, 'globalVendorId');
+
+  const gv = await prisma.globalVendor.findFirst({
+    where: { id: globalVendorId, status: 'ACTIVE', approvedStatus: true },
+  });
+  if (!gv) throw new Error('Vendor is not available.');
+
+  const existing = await prisma.maintenanceVendor.findFirst({
+    where: { landlordId, globalVendorId, archivedAt: null },
+  });
+  if (existing) throw new Error('This vendor is already in your list.');
+
+  let created;
+  try {
+    created = await prisma.maintenanceVendor.create({
+      data: {
+        landlordId,
+        globalVendorId,
+        name: gv.name,
+        email: gv.email,
+        phone: gv.phone,
+        specialty: gv.specialty,
+        address: null,
+        notes: gv.description ?? null,
+        approvedStatus: true,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new Error('This vendor is already in your list.');
+    }
+    throw error;
+  }
+
+  await audit(user.userId, user.email, 'maintenance_vendor.added_from_global', 'MaintenanceVendor', created.id, landlordId, { globalVendorId });
   revalidatePath('/maintenance/vendors');
   revalidatePath('/maintenance');
 }

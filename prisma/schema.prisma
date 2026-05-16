@@ -960,6 +960,7 @@ model MaintenanceVendor {
   insuranceExpiresAt DateTime?
   userId             String?   @unique
   portalEnabledAt    DateTime?
+  globalVendorId     String?
   archivedAt         DateTime?
   archivedBy         String?
   createdAt          DateTime  @default(now())
@@ -967,11 +968,13 @@ model MaintenanceVendor {
 
   landlord         LandlordProfile        @relation(fields: [landlordId], references: [id])
   user             User?                  @relation(fields: [userId], references: [id])
+  globalVendor     GlobalVendor?          @relation(fields: [globalVendorId], references: [id])
   assignedRequests MaintenanceRequest[]
   workOrders       MaintenanceWorkOrder[]
 
   @@index([landlordId])
   @@index([landlordId, archivedAt])
+  @@index([globalVendorId])
 }
 
 model GlobalVendor {
@@ -994,6 +997,8 @@ model GlobalVendor {
   archivedAt     DateTime?
   archivedBy     String?
   createdBy      String?
+
+  localCopies MaintenanceVendor[]
 
   @@index([status])
   @@index([approvedStatus])

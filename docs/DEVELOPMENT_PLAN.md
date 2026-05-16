@@ -106,6 +106,7 @@ Latest confirmed merged work includes:
 - Property & Unit Photos (galleries, primary photo, list thumbnails, secure image endpoints)
 - Phase 8 reporting & accounting expansion (reports hub + 7 reports with date-range filters and CSV export; owner statements deferred)
 - Phase 9 tenant portal expansion (tenant lease view, payment history + balance, two-way landlord⇄tenant messaging with inbox/thread, unread badges; owner statements/attachments/email-SMS-of-messages/realtime deferred)
+- Landlord⇄Vendor messaging (generalized inbox for tenants AND portal-linked vendors, landlord vendor thread + vendor-portal thread, vendor mark-read + nav badge; schema-free); Phase 5.3 marketplace "Request a quote" now actually delivers (in-app message to a portal-linked workspace copy of the global vendor, else queued email via the Phase 6 outbox, lead always recorded)
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -449,6 +450,7 @@ Note:
 /financials/rent-roll
 /messages
 /messages/[tenantId]
+/messages/vendor/[vendorId]
 ```
 
 ### Tenant Routes
@@ -460,6 +462,14 @@ Note:
 /tenant/maintenance
 /tenant/documents
 /tenant/messages
+```
+
+### Vendor Routes
+
+```text
+/vendor/dashboard
+/vendor/work-orders/[id]
+/vendor/messages
 ```
 
 ### Secure Download API Routes
@@ -862,6 +872,23 @@ Build:
 - tenant maintenance requests
 - tenant document vault
 - landlord messages
+
+### Landlord⇄Vendor Messaging
+
+Status:
+
+```text
+Complete
+```
+
+Build:
+
+- generalized messaging inbox for tenants AND portal-linked vendors (participant resolver: tenant preferred, else vendor)
+- landlord vendor thread (`/messages/vendor/[vendorId]`) + vendor-portal thread (`/vendor/messages`)
+- `sendVendorMessageAction` / `sendVendorPortalMessageAction`; `markMessagesReadAction` extended to VENDOR / MAINTENANCE_PROVIDER
+- vendor nav Messages link with resilient unread badge
+- Phase 5.3 marketplace "Request a quote" now delivers: in-app message when a portal-linked workspace copy of the global vendor exists, else queued email via the Phase 6 outbox; the `GlobalVendorLead` is always recorded (delivery is best-effort)
+- schema-free (Message is user↔user; `notificationKind` is free-text)
 
 ---
 

@@ -17,6 +17,7 @@ import { isSupportedCurrency, isSupportedTimezone } from '@/lib/time/format';
 import { setPlatformSetting } from '@/lib/settings/platform';
 import { maintenanceAttachmentKey, putMaintenanceBlob, propertyPhotoKey, unitPhotoKey, putPhotoBlob, deletePhotoBlob } from '@/lib/storage/blobs';
 import { validateUploadFile, validateImageFile } from '@/lib/storage/validate';
+import { queueNotification } from '@/lib/notifications/outbox';
 
 const operationalRoles: UserRole[] = [
   UserRole.VENDOR,
@@ -606,7 +607,33 @@ export async function recordGlobalVendorInquiryAction(formData: FormData) {
   });
 
   await audit(user.userId, user.email, 'global_vendor.inquiry', 'GlobalVendor', globalVendorId, landlordId, { note: !!note });
-  // Notification wiring through the Phase 6 outbox is deferred (out of scope).
+
+  try {
+    const localVendor = await prisma.maintenanceVendor.findFirst({
+      where: { landlordId, globalVendorId, archivedAt: null, userId: { not: null } },
+    });
+    const subject = `Quote request from a CayRentManager landlord`;
+    const body = `A landlord has requested a quote${note ? `:\n\n${note}` : '.'}\n\nReply via the CayRentManager vendor portal or contact them back.`;
+    if (localVendor?.userId) {
+      const landlord = await prisma.landlordProfile.findUnique({ where: { id: landlordId }, select: { ownerUserId: true } });
+      if (landlord) {
+        await prisma.message.create({
+          data: {
+            landlordId,
+            senderId: landlord.ownerUserId,
+            receiverId: localVendor.userId,
+            subject,
+            message: note || 'Requesting a quote.',
+          },
+        });
+      }
+    } else if (gv.email) {
+      await queueNotification({ landlordId, recipientEmail: gv.email, channel: 'EMAIL', notificationKind: 'VENDOR_INQUIRY', subject, body });
+    }
+  } catch {
+    /* delivery is best-effort; the lead is the source of truth */
+  }
+
   revalidatePath('/maintenance/vendors');
 }
 
@@ -1767,6 +1794,8 @@ export async function markMessagesReadAction(formData: FormData) {
     UserRole.LANDLORD,
     UserRole.PROPERTY_MANAGER,
     UserRole.ACCOUNTANT,
+    UserRole.VENDOR,
+    UserRole.MAINTENANCE_PROVIDER,
     UserRole.SUPERADMIN,
   ]);
   const withSenderId = text(formData, 'withSenderId');
@@ -1779,5 +1808,54 @@ export async function markMessagesReadAction(formData: FormData) {
     data: { readAt: new Date() },
   });
   revalidatePath('/tenant/messages');
+  revalidatePath('/vendor/messages');
   revalidatePath('/messages');
+}
+
+export async function sendVendorMessageAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const vendorId = requiredText(formData, 'vendorId');
+  const vendor = await prisma.maintenanceVendor.findFirst({ where: { id: vendorId, landlordId, archivedAt: null } });
+  if (!vendor) throw new Error('Vendor not found for this workspace.');
+  if (!vendor.userId) throw new Error('This vendor has no linked portal login yet and cannot be messaged.');
+
+  const subject = (text(formData, 'subject') || 'Message from landlord').slice(0, 150);
+  const message = requiredText(formData, 'message').slice(0, 4000);
+
+  const created = await prisma.message.create({
+    data: {
+      landlordId,
+      senderId: user.userId,
+      receiverId: vendor.userId,
+      subject,
+      message,
+    },
+  });
+
+  await audit(user.userId, user.email, 'message.sent', 'Message', created.id, landlordId, { from: 'landlord', vendorId });
+  revalidatePath('/messages');
+  revalidatePath('/messages/vendor/' + vendorId);
+  revalidatePath('/vendor/messages');
+}
+
+export async function sendVendorPortalMessageAction(formData: FormData) {
+  const { user, vendor } = await requireVendorUser();
+
+  const subject = (text(formData, 'subject') || 'Message from vendor').slice(0, 150);
+  const message = requiredText(formData, 'message').slice(0, 4000);
+
+  const created = await prisma.message.create({
+    data: {
+      landlordId: vendor.landlordId,
+      senderId: user.userId,
+      receiverId: vendor.landlord.ownerUserId,
+      subject,
+      message,
+    },
+  });
+
+  await audit(user.userId, user.email, 'message.sent', 'Message', created.id, vendor.landlordId, { from: 'vendor', vendorId: vendor.id });
+  revalidatePath('/vendor/messages');
+  revalidatePath('/messages');
+  revalidatePath('/messages/vendor/' + vendor.id);
 }

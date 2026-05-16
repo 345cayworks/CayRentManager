@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   groupLandlordInbox,
+  resolveParticipant,
   sortChronological,
   unreadCount,
   type ThreadMessage,
@@ -72,14 +73,14 @@ describe('groupLandlordInbox', () => {
     ];
 
     const groups = groupLandlordInbox(messages, landlord);
-    expect(groups.map((g) => g.tenantUserId)).toEqual(['tenantB', 'tenantA']);
+    expect(groups.map((g) => g.participantUserId)).toEqual(['tenantB', 'tenantA']);
 
-    const a = groups.find((g) => g.tenantUserId === 'tenantA')!;
+    const a = groups.find((g) => g.participantUserId === 'tenantA')!;
     expect(a.messages).toHaveLength(3);
     expect(a.unreadForLandlord).toBe(1);
     expect(a.lastAt).toEqual(new Date('2026-01-03T00:00:00Z'));
 
-    const b = groups.find((g) => g.tenantUserId === 'tenantB')!;
+    const b = groups.find((g) => g.participantUserId === 'tenantB')!;
     expect(b.unreadForLandlord).toBe(1);
   });
 
@@ -89,7 +90,7 @@ describe('groupLandlordInbox', () => {
     ];
     const groups = groupLandlordInbox(messages, landlord);
     expect(groups).toHaveLength(1);
-    expect(groups[0].tenantUserId).toBe('tenantC');
+    expect(groups[0].participantUserId).toBe('tenantC');
     expect(groups[0].unreadForLandlord).toBe(0);
   });
 
@@ -99,6 +100,47 @@ describe('groupLandlordInbox', () => {
       msg({ id: '2', senderId: 'tenantNew', receiverId: 'owner', createdAt: new Date('2026-02-01T00:00:00Z') }),
     ];
     const groups = groupLandlordInbox(messages, landlord);
-    expect(groups.map((g) => g.tenantUserId)).toEqual(['tenantNew', 'tenantOld']);
+    expect(groups.map((g) => g.participantUserId)).toEqual(['tenantNew', 'tenantOld']);
+  });
+});
+
+describe('resolveParticipant', () => {
+  it('resolves to TENANT when in the tenant map', () => {
+    const tenants = new Map([['u1', { id: 't1', fullName: 'Alice Tenant' }]]);
+    const vendors = new Map<string, { id: string; name: string }>();
+    expect(resolveParticipant('u1', tenants, vendors)).toEqual({
+      kind: 'TENANT',
+      id: 't1',
+      name: 'Alice Tenant',
+      userId: 'u1',
+    });
+  });
+
+  it('resolves to VENDOR when only in the vendor map', () => {
+    const tenants = new Map<string, { id: string; fullName: string }>();
+    const vendors = new Map([['u2', { id: 'v1', name: 'Bob Vendor' }]]);
+    expect(resolveParticipant('u2', tenants, vendors)).toEqual({
+      kind: 'VENDOR',
+      id: 'v1',
+      name: 'Bob Vendor',
+      userId: 'u2',
+    });
+  });
+
+  it('prefers TENANT when present in both maps', () => {
+    const tenants = new Map([['u3', { id: 't3', fullName: 'Both Tenant' }]]);
+    const vendors = new Map([['u3', { id: 'v3', name: 'Both Vendor' }]]);
+    expect(resolveParticipant('u3', tenants, vendors)).toEqual({
+      kind: 'TENANT',
+      id: 't3',
+      name: 'Both Tenant',
+      userId: 'u3',
+    });
+  });
+
+  it('returns null when in neither map', () => {
+    const tenants = new Map<string, { id: string; fullName: string }>();
+    const vendors = new Map<string, { id: string; name: string }>();
+    expect(resolveParticipant('unknown', tenants, vendors)).toBeNull();
   });
 });

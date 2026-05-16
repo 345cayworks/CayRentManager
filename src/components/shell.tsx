@@ -55,6 +55,7 @@ const operationalLinks: NavLink[] = [{ href: '/unauthorized', label: 'Access Pen
 const vendorLinks: NavLink[] = [
   { href: '/vendor/dashboard', label: 'Dashboard' },
   { href: '/vendor/dashboard?tab=completed', label: 'Completed Work' },
+  { href: '/vendor/messages', label: 'Messages' },
   { href: '/account/profile', label: 'Profile' },
 ];
 
@@ -144,6 +145,19 @@ async function tenantLinksWithMessageBadge(userId: string): Promise<NavLink[]> {
   );
 }
 
+async function vendorLinksWithMessageBadge(userId: string): Promise<NavLink[]> {
+  let unread = 0;
+  try {
+    unread = await prisma.message.count({ where: { receiverId: userId, readAt: null } });
+  } catch {
+    return vendorLinks;
+  }
+  if (unread === 0) return vendorLinks;
+  return vendorLinks.map((link) =>
+    link.href === '/vendor/messages' ? { ...link, badge: unread } : link,
+  );
+}
+
 async function linksForRole(role: UserRole | undefined, userId: string | undefined): Promise<NavLink[]> {
   if (!role) return [];
   if (role === UserRole.SUPERADMIN) return adminLinks;
@@ -155,7 +169,10 @@ async function linksForRole(role: UserRole | undefined, userId: string | undefin
     if (!userId) return baseLandlordLinks;
     return landlordLinksWithAlertBadge(userId);
   }
-  if (VENDOR_PORTAL_ROLES.has(role)) return vendorLinks;
+  if (VENDOR_PORTAL_ROLES.has(role)) {
+    if (!userId) return vendorLinks;
+    return vendorLinksWithMessageBadge(userId);
+  }
   if (OPERATIONAL_ROLES.has(role)) return operationalLinks;
   return [];
 }

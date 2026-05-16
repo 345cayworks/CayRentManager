@@ -5,7 +5,7 @@ import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { getEffectiveTimezone } from '@/lib/time/effective';
 import { formatDate } from '@/lib/time/format';
-import { groupLandlordInbox } from '@/lib/messaging/threads';
+import { groupLandlordInbox, resolveParticipant } from '@/lib/messaging/threads';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export default async function Page() {
   const { landlordId } = await getCurrentLandlordWorkspace();
   const tz = await getEffectiveTimezone();
 
-  const [landlord, memberships, messages, tenants] = await Promise.all([
+  const [landlord, memberships, messages, tenants, vendors] = await Promise.all([
     prisma.landlordProfile.findUnique({ where: { id: landlordId }, select: { ownerUserId: true } }),
     prisma.landlordMembership.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, select: { userId: true } }),
     prisma.message.findMany({
@@ -22,29 +22,36 @@ export default async function Page() {
       orderBy: { createdAt: 'asc' },
     }),
     prisma.tenant.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, select: { id: true, fullName: true, userId: true } }),
+    prisma.maintenanceVendor.findMany({ where: { landlordId, archivedAt: null, userId: { not: null } }, select: { id: true, name: true, userId: true } }),
   ]);
 
   const landlordUserIds = new Set<string>(memberships.map((m) => m.userId));
   if (landlord) landlordUserIds.add(landlord.ownerUserId);
 
   const tenantsByUserId = new Map(tenants.filter((t) => t.userId).map((t) => [t.userId as string, t]));
+  const vendorsByUserId = new Map(vendors.filter((v) => v.userId).map((v) => [v.userId as string, v]));
   const groups = groupLandlordInbox(
     messages.map((m) => ({ id: m.id, senderId: m.senderId, receiverId: m.receiverId, readAt: m.readAt, createdAt: m.createdAt })),
     landlordUserIds,
   );
 
   const conversationTenantIds = new Set<string>();
+  const conversationVendorIds = new Set<string>();
   const rows = groups
     .map((group) => {
-      const tenant = tenantsByUserId.get(group.tenantUserId);
-      if (!tenant) return null;
-      conversationTenantIds.add(tenant.id);
+      const ref = resolveParticipant(group.participantUserId, tenantsByUserId, vendorsByUserId);
+      if (!ref) return null;
+      if (ref.kind === 'TENANT') conversationTenantIds.add(ref.id);
+      else conversationVendorIds.add(ref.id);
       const last = messages.find((m) => m.id === group.messages[group.messages.length - 1]?.id);
-      return { tenant, group, snippet: last?.message ?? '' };
+      const href = ref.kind === 'TENANT' ? `/messages/${ref.id}` : `/messages/vendor/${ref.id}`;
+      return { ref, href, group, snippet: last?.message ?? '' };
     })
     .filter((row): row is NonNullable<typeof row> => row !== null);
 
-  const withoutMessages = tenants.filter((t) => t.userId && !conversationTenantIds.has(t.id));
+  const tenantsWithoutMessages = tenants.filter((t) => t.userId && !conversationTenantIds.has(t.id));
+  const vendorsWithoutMessages = vendors.filter((v) => v.userId && !conversationVendorIds.has(v.id));
+  const hasStartTargets = tenantsWithoutMessages.length > 0 || vendorsWithoutMessages.length > 0;
 
   return (
     <Shell title="Messages">
@@ -57,11 +64,16 @@ export default async function Page() {
             <p className="p-4 text-slate-600">No conversations yet.</p>
           ) : (
             <ul className="divide-y">
-              {rows.map(({ tenant, group, snippet }) => (
-                <li key={tenant.id}>
-                  <Link href={`/messages/${tenant.id}`} className="flex items-center justify-between p-4 hover:bg-slate-50">
+              {rows.map(({ ref, href, group, snippet }) => (
+                <li key={`${ref.kind}-${ref.id}`}>
+                  <Link href={href} className="flex items-center justify-between p-4 hover:bg-slate-50">
                     <div className="min-w-0">
-                      <p className="font-medium">{tenant.fullName}</p>
+                      <p className="font-medium">
+                        {ref.name}
+                        <span className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${ref.kind === 'VENDOR' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                          {ref.kind === 'VENDOR' ? 'Vendor' : 'Tenant'}
+                        </span>
+                      </p>
                       <p className="text-sm text-slate-500 truncate max-w-md">{snippet}</p>
                     </div>
                     <div className="text-right text-sm">
@@ -83,14 +95,28 @@ export default async function Page() {
           <div className="p-4 border-b">
             <h3 className="font-semibold">Start a conversation</h3>
           </div>
-          {withoutMessages.length === 0 ? (
-            <p className="p-4 text-slate-600">All active tenants with a linked login already have a conversation.</p>
+          {!hasStartTargets ? (
+            <p className="p-4 text-slate-600">All active tenants and vendors with a linked login already have a conversation.</p>
           ) : (
             <ul className="divide-y">
-              {withoutMessages.map((tenant) => (
-                <li key={tenant.id}>
+              {tenantsWithoutMessages.map((tenant) => (
+                <li key={`tenant-${tenant.id}`}>
                   <Link href={`/messages/${tenant.id}`} className="flex items-center justify-between p-4 hover:bg-slate-50">
-                    <span>{tenant.fullName}</span>
+                    <span>
+                      {tenant.fullName}
+                      <span className="ml-2 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Tenant</span>
+                    </span>
+                    <span className="text-sm text-brand-navy underline">Start conversation</span>
+                  </Link>
+                </li>
+              ))}
+              {vendorsWithoutMessages.map((vendor) => (
+                <li key={`vendor-${vendor.id}`}>
+                  <Link href={`/messages/vendor/${vendor.id}`} className="flex items-center justify-between p-4 hover:bg-slate-50">
+                    <span>
+                      {vendor.name}
+                      <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Vendor</span>
+                    </span>
                     <span className="text-sm text-brand-navy underline">Start conversation</span>
                   </Link>
                 </li>

@@ -1093,6 +1093,10 @@ model Message {
   landlord LandlordProfile @relation(fields: [landlordId], references: [id])
   sender   User            @relation("Sender", fields: [senderId], references: [id])
   receiver User            @relation("Receiver", fields: [receiverId], references: [id])
+
+  @@index([landlordId, receiverId, readAt])
+  @@index([landlordId, senderId])
+  @@index([landlordId, createdAt])
 }
 
 model AuditLog {

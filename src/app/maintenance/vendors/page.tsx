@@ -406,6 +406,9 @@ export default async function VendorsPage({
                         <button className="w-fit rounded border px-3 py-1 font-medium hover:bg-slate-50">
                           Send inquiry
                         </button>
+                        <p className="text-[11px] text-slate-500">
+                          We&apos;ll forward your request to the vendor (in-app if they use CayRentManager, otherwise by email).
+                        </p>
                       </form>
                     </details>
                   </div>

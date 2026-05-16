@@ -637,11 +637,15 @@ async function uploadEntityPhotos(opts: {
   // validate ALL first so a bad file rejects the batch before any blob write
   const valid = opts.files.filter((f) => f && f.size > 0);
   valid.forEach(validateImageFile);
+  const sortBase =
+    opts.kind === 'property'
+      ? await prisma.propertyPhoto.count({ where: { propertyId: opts.entityId } })
+      : await prisma.unitPhoto.count({ where: { unitId: opts.entityId } });
   for (let i = 0; i < valid.length; i++) {
     const file = valid[i];
     if (opts.kind === 'property') {
       const photo = await prisma.propertyPhoto.create({
-        data: { landlordId: opts.landlordId, propertyId: opts.entityId, storageKey: '', fileName: file.name, contentType: file.type, fileSize: 0, uploadedBy: opts.userId, sortOrder: Date.now() + i },
+        data: { landlordId: opts.landlordId, propertyId: opts.entityId, storageKey: '', fileName: file.name, contentType: file.type, fileSize: 0, uploadedBy: opts.userId, sortOrder: sortBase + i },
       });
       const key = propertyPhotoKey(opts.landlordId, opts.entityId, photo.id, file.name);
       try {
@@ -653,7 +657,7 @@ async function uploadEntityPhotos(opts: {
       }
     } else {
       const photo = await prisma.unitPhoto.create({
-        data: { landlordId: opts.landlordId, unitId: opts.entityId, storageKey: '', fileName: file.name, contentType: file.type, fileSize: 0, uploadedBy: opts.userId, sortOrder: Date.now() + i },
+        data: { landlordId: opts.landlordId, unitId: opts.entityId, storageKey: '', fileName: file.name, contentType: file.type, fileSize: 0, uploadedBy: opts.userId, sortOrder: sortBase + i },
       });
       const key = unitPhotoKey(opts.landlordId, opts.entityId, photo.id, file.name);
       try {

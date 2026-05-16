@@ -974,6 +974,31 @@ model MaintenanceVendor {
   @@index([landlordId, archivedAt])
 }
 
+model GlobalVendor {
+  id             String       @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  website        String?
+  specialty      String?
+  serviceAreas   String?
+  description    String?
+  logoUrl        String?
+  approvedStatus Boolean      @default(false)
+  featured       Boolean      @default(false)
+  sponsored      Boolean      @default(false)
+  monthlyFee     Decimal?
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  archivedAt     DateTime?
+  archivedBy     String?
+  createdBy      String?
+
+  @@index([status])
+  @@index([approvedStatus])
+}
+
 model MaintenanceWorkOrder {
   id                   String          @id @default(cuid())
   maintenanceRequestId String

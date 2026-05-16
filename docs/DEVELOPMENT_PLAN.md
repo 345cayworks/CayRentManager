@@ -95,6 +95,7 @@ Latest confirmed merged work includes:
 - Phase 4 alert center and alert automation foundation
 - Phase 6 notification infrastructure closeout (alert escalation engine + team-member resolution; SMS/WhatsApp channel abstraction)
 - document vault foundation
+- Phase 5.1 global vendor foundation
 - registration workflow tightening
 - professional onboarding page
 - auth input readability fix
@@ -412,6 +413,7 @@ Note:
 /admin
 /admin/users
 /admin/landlords
+/admin/vendors
 /admin/audit
 /admin/settings
 ```
@@ -618,6 +620,12 @@ Concierge dispatch: 5%–15% of work order value
 ## 8. Recommended Next Development Phases
 
 ## Phase 5.1 — Global Vendor Foundation
+
+Status:
+
+```text
+Complete
+```
 
 Priority:
 

@@ -14,6 +14,7 @@ const adminLinks: NavLink[] = [
   { href: '/admin/analytics', label: 'Analytics' },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/landlords', label: 'Landlords' },
+  { href: '/admin/vendors', label: 'Vendors' },
   { href: '/admin/billing', label: 'Billing' },
   { href: '/admin/audit', label: 'Audit' },
   { href: '/admin/safety', label: 'Safety' },

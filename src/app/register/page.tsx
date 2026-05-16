@@ -1,19 +1,38 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { IdentityAuthForm } from '@/components/identity-auth-form';
+import { AuthShell } from '@/components/public/auth-shell';
+
+export const metadata: Metadata = {
+  title: 'Create your workspace · CayRentManager',
+  description:
+    'Create a CayRentManager landlord workspace to manage rent, leases, maintenance, vendors, and tenants.',
+};
 
 export default function RegisterPage() {
   return (
-    <main className="min-h-screen bg-slate-50 p-8">
-      <div className="max-w-xl mx-auto rounded-xl bg-white border shadow-sm p-6">
-        <h1 className="text-2xl font-semibold">Create landlord workspace</h1>
-        <div className="mt-6">
-          <Suspense fallback={<div className="text-sm text-slate-400">Loading...</div>}>
-            <IdentityAuthForm mode="signup" />
-          </Suspense>
-        </div>
-        <Link href="/login" className="block text-sm text-slate-600 mt-4">Already registered? Sign in</Link>
-      </div>
-    </main>
+    <AuthShell
+      eyebrow="Get started"
+      title="Create your workspace"
+      subtitle="Set up a landlord workspace to manage rent, leases, maintenance, vendors, and tenants."
+      footer={
+        <p>
+          Already registered?{' '}
+          <Link
+            href="/login"
+            className="font-semibold text-cyan-700 hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
+          >
+            Sign in
+          </Link>
+        </p>
+      }
+    >
+      <Suspense
+        fallback={<div className="text-sm text-slate-500">Loading…</div>}
+      >
+        <IdentityAuthForm mode="signup" />
+      </Suspense>
+    </AuthShell>
   );
 }

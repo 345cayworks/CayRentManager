@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LeaseStatus, PaymentStatus, RecordStatus } from '@prisma/client';
 import { Shell } from '@/components/shell';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import { buildLeaseAlertFeed, type LeaseAlertSeverity } from '@/lib/leases/lease-alerts';
@@ -273,7 +274,7 @@ export default async function Page() {
                         <div className="flex gap-2">
                           <form action={terminateLeaseAction}>
                             <input type="hidden" name="leaseId" value={lease.id} />
-                            <button className="text-sm rounded border px-3 py-1">Terminate</button>
+                            <ConfirmButton message="Terminate this lease? This ends the active tenancy." className="text-sm rounded border px-3 py-1">Terminate</ConfirmButton>
                           </form>
 
                           <form action={expireLeaseAction}>

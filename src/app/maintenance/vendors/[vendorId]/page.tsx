@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Shell } from '@/components/shell';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
 import {
@@ -233,9 +234,12 @@ export default async function VendorDetailPage({ params }: { params: { vendorId:
                 ) : null}
                 <form action={disableVendorPortalAction}>
                   <input type="hidden" name="vendorId" value={vendor.id} />
-                  <button className="rounded border border-red-200 px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                  <ConfirmButton
+                    message="Disable portal access for this vendor? They will no longer be able to sign in."
+                    className="rounded border border-red-200 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                  >
                     Disable portal
-                  </button>
+                  </ConfirmButton>
                 </form>
               </div>
             ) : pendingRequest ? (

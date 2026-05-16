@@ -170,6 +170,30 @@ export function IdentityAuthForm({
                 <li>One number</li>
               </ul>
             </div>
+            <label className="flex items-start gap-2 text-xs text-slate-600">
+              <input required type="checkbox" name="acceptTerms" className="mt-0.5" />
+              <span>
+                I agree to the{' '}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-brand-navy underline"
+                >
+                  Terms
+                </a>{' '}
+                and{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-brand-navy underline"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </span>
+            </label>
           </>
         ) : null}
         {passwordValidation ? <p className="text-xs text-amber-700">{passwordValidation}</p> : null}

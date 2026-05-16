@@ -28,6 +28,7 @@ const baseLandlordLinks: NavLink[] = [
   { href: '/properties', label: 'Properties' },
   { href: '/units', label: 'Units' },
   { href: '/tenants', label: 'Tenants' },
+  { href: '/messages', label: 'Messages' },
   { href: '/leases', label: 'Leases' },
   { href: '/payments', label: 'Rent Payments' },
   { href: '/payments/settings', label: 'Rent Payment Settings' },
@@ -41,8 +42,11 @@ const baseLandlordLinks: NavLink[] = [
 
 const tenantLinks: NavLink[] = [
   { href: '/tenant/dashboard', label: 'Dashboard' },
+  { href: '/tenant/lease', label: 'Lease' },
+  { href: '/tenant/payments', label: 'Payments' },
   { href: '/tenant/maintenance', label: 'Maintenance' },
   { href: '/tenant/documents', label: 'Documents' },
+  { href: '/tenant/messages', label: 'Messages' },
   { href: '/account/profile', label: 'Profile' },
 ];
 
@@ -96,7 +100,22 @@ async function landlordLinksWithAlertBadge(userId: string): Promise<NavLink[]> {
     onboardingBadge = 0;
   }
 
-  if (activeAlertCount === 0 && onboardingBadge === 0) return baseLandlordLinks;
+  let unreadMessages = 0;
+  try {
+    const [landlord, memberships] = await Promise.all([
+      prisma.landlordProfile.findUnique({ where: { id: landlordId }, select: { ownerUserId: true } }),
+      prisma.landlordMembership.findMany({ where: { landlordId, status: RecordStatus.ACTIVE }, select: { userId: true } }),
+    ]);
+    const landlordUserIds = memberships.map((m) => m.userId);
+    if (landlord) landlordUserIds.push(landlord.ownerUserId);
+    unreadMessages = await prisma.message.count({
+      where: { landlordId, receiverId: { in: landlordUserIds }, readAt: null },
+    });
+  } catch {
+    unreadMessages = 0;
+  }
+
+  if (activeAlertCount === 0 && onboardingBadge === 0 && unreadMessages === 0) return baseLandlordLinks;
 
   return baseLandlordLinks.map((link) => {
     if (link.href === '/alerts' && activeAlertCount > 0) {
@@ -105,14 +124,33 @@ async function landlordLinksWithAlertBadge(userId: string): Promise<NavLink[]> {
     if (link.href === '/onboarding' && onboardingBadge > 0) {
       return { ...link, badge: onboardingBadge };
     }
+    if (link.href === '/messages' && unreadMessages > 0) {
+      return { ...link, badge: unreadMessages };
+    }
     return link;
   });
+}
+
+async function tenantLinksWithMessageBadge(userId: string): Promise<NavLink[]> {
+  let unread = 0;
+  try {
+    unread = await prisma.message.count({ where: { receiverId: userId, readAt: null } });
+  } catch {
+    return tenantLinks;
+  }
+  if (unread === 0) return tenantLinks;
+  return tenantLinks.map((link) =>
+    link.href === '/tenant/messages' ? { ...link, badge: unread } : link,
+  );
 }
 
 async function linksForRole(role: UserRole | undefined, userId: string | undefined): Promise<NavLink[]> {
   if (!role) return [];
   if (role === UserRole.SUPERADMIN) return adminLinks;
-  if (role === UserRole.TENANT) return tenantLinks;
+  if (role === UserRole.TENANT) {
+    if (!userId) return tenantLinks;
+    return tenantLinksWithMessageBadge(userId);
+  }
   if (LANDLORD_ROLES.has(role)) {
     if (!userId) return baseLandlordLinks;
     return landlordLinksWithAlertBadge(userId);

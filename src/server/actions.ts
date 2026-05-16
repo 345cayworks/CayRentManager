@@ -1710,3 +1710,74 @@ export async function updateWorkspaceTimePrefsAction(formData: FormData) {
   revalidatePath('/onboarding/company-profile');
   revalidatePath('/dashboard');
 }
+
+export async function sendTenantMessageAction(formData: FormData) {
+  const user = await requireRole([UserRole.TENANT]);
+  const tenant = await prisma.tenant.findFirst({
+    where: { userId: user.userId, status: RecordStatus.ACTIVE },
+    include: { landlord: true },
+  });
+  if (!tenant) throw new Error('No active tenant profile is linked to this account.');
+
+  const subject = (text(formData, 'subject') || 'Message from tenant').slice(0, 150);
+  const message = requiredText(formData, 'message').slice(0, 4000);
+
+  const created = await prisma.message.create({
+    data: {
+      landlordId: tenant.landlordId,
+      senderId: user.userId,
+      receiverId: tenant.landlord.ownerUserId,
+      subject,
+      message,
+    },
+  });
+
+  await audit(user.userId, user.email, 'message.sent', 'Message', created.id, tenant.landlordId, { from: 'tenant' });
+  revalidatePath('/tenant/messages');
+}
+
+export async function sendLandlordMessageAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const tenantId = requiredText(formData, 'tenantId');
+  const tenant = await prisma.tenant.findFirst({ where: { id: tenantId, landlordId } });
+  if (!tenant) throw new Error('Tenant not found for this workspace.');
+  if (!tenant.userId) throw new Error('This tenant has no linked login yet and cannot be messaged.');
+
+  const subject = (text(formData, 'subject') || 'Message from landlord').slice(0, 150);
+  const message = requiredText(formData, 'message').slice(0, 4000);
+
+  const created = await prisma.message.create({
+    data: {
+      landlordId,
+      senderId: user.userId,
+      receiverId: tenant.userId,
+      subject,
+      message,
+    },
+  });
+
+  await audit(user.userId, user.email, 'message.sent', 'Message', created.id, landlordId, { from: 'landlord', tenantId });
+  revalidatePath('/messages');
+  revalidatePath('/messages/' + tenantId);
+}
+
+export async function markMessagesReadAction(formData: FormData) {
+  const user = await requireRole([
+    UserRole.TENANT,
+    UserRole.LANDLORD,
+    UserRole.PROPERTY_MANAGER,
+    UserRole.ACCOUNTANT,
+    UserRole.SUPERADMIN,
+  ]);
+  const withSenderId = text(formData, 'withSenderId');
+  await prisma.message.updateMany({
+    where: {
+      receiverId: user.userId,
+      readAt: null,
+      ...(withSenderId ? { senderId: withSenderId } : {}),
+    },
+    data: { readAt: new Date() },
+  });
+  revalidatePath('/tenant/messages');
+  revalidatePath('/messages');
+}

@@ -3,62 +3,62 @@ import type { Metadata } from 'next';
 import { SiteFooter } from '@/components/public/site-footer';
 
 export const metadata: Metadata = {
-  title: 'CayRentManager — Cayman rental property operations',
+  title: 'CayRentManager — get paid on time, run a tighter rental business',
   description:
-    'Run rent, leases, maintenance, vendors, documents, reporting, and a tenant portal from one secure workspace built for Cayman landlords and property managers.',
+    'Stop chasing rent and living in spreadsheets. CayRentManager collects and reconciles rent, handles maintenance, keeps leases and vendors in order, and shows your numbers — built in Cayman for KYD and local payment realities.',
 };
 
 const capabilities: { title: string; copy: string }[] = [
   {
-    title: 'Rent ledger',
-    copy: 'Invoices, payments, balances, payment-proof upload, and receipts in one organized ledger.',
+    title: 'Get paid — and prove it',
+    copy: 'Invoice tenants, log every payment, and hand over an instant receipt. Balances reconcile themselves, so you always know exactly who owes what.',
   },
   {
-    title: 'Maintenance operations',
-    copy: 'Tenant-submitted requests with categories and priority, vendor assignment, work-order dispatch, SLA tracking, and a dedicated vendor portal.',
+    title: 'Repairs handled, not chased',
+    copy: 'Tenants report issues in a tap. You assign a vendor, dispatch the work order, and track it to done with SLA timers so nothing slips through.',
   },
   {
-    title: 'Vendor marketplace',
-    copy: 'Curated global vendors with featured listings, add-to-workspace, and request-a-quote.',
+    title: 'A vendor bench, ready to go',
+    copy: 'Pull from a curated vendor marketplace, add the ones you trust to your workspace, and request quotes — instead of digging through old message threads.',
   },
   {
-    title: 'Leases & tenants',
-    copy: 'Lease records, renewals, notices, lease documents, tenant profiles, and secure invitations.',
+    title: 'Leases that never lapse quietly',
+    copy: 'Every lease, renewal, notice, and document in one place — with the tenant invited and on record from day one.',
   },
   {
-    title: 'Accounting & reporting',
-    copy: 'Expenses plus rent roll, tenant balances, payment history, property P&L, cashflow, maintenance cost, and lease expiry — with CSV export.',
+    title: 'Your numbers, on demand',
+    copy: 'Rent roll, P&L, cashflow, balances, and lease-expiry reports — exportable to CSV. Owner updates and tax prep take minutes, not weekends.',
   },
   {
-    title: 'Alerts & notifications',
-    copy: 'Lease and alert engine, daily email digest, per-user preferences, escalation rules, and SMS/WhatsApp-ready channels.',
+    title: 'Nothing falls through',
+    copy: 'Automatic alerts and a daily digest for rent due, overdue balances, and lease expiries — with escalation and SMS/WhatsApp-ready reminders.',
   },
   {
-    title: 'Document vault',
-    copy: 'Real secure file storage with visibility rules, tenant-visible documents, and property and unit photos.',
+    title: 'One secure home for every document',
+    copy: 'Leases, receipts, inspections, and property photos stored safely — shared with tenants only when you decide to.',
   },
   {
-    title: 'Tenant portal',
-    copy: 'Dashboard, lease view, payment history and balance, maintenance, documents, and two-way messaging with the landlord.',
+    title: 'Tenants self-serve, you field fewer calls',
+    copy: 'A portal where tenants see their lease, balance, and payment history, submit maintenance, and message you directly.',
   },
   {
-    title: 'Platform & controls',
-    copy: 'Multi-role workspaces, superadmin console, audit log, configurable timezone and currency, and subscription billing.',
+    title: 'Control as you grow',
+    copy: 'Role-based access for managers and accountants, a full audit trail, and per-workspace currency and timezone — without enterprise overhead.',
   },
 ];
 
 const audiences: { title: string; copy: string }[] = [
   {
     title: 'Small landlords',
-    copy: 'Owners with 1–10 units who need rent records, receipts, maintenance tracking, and tenant visibility without heavy software.',
+    copy: 'You did not get into property to live in spreadsheets. Track rent, receipts, and repairs for 1–10 units in minutes a week — and look professional doing it.',
   },
   {
     title: 'Property managers',
-    copy: 'Teams handling multiple units, vendors, leases, payments, and daily service requests across a portfolio.',
+    copy: 'Juggling owners, tenants, and vendors across a portfolio? Keep every unit, payment, and service request straight — and turn owner reporting into a one-click export.',
   },
   {
     title: 'Growing portfolios',
-    copy: 'Operators who need stronger controls, accounting visibility, an audit trail, and multi-user access.',
+    copy: 'Outgrowing what spreadsheets can hold? Add managers and accountants with the right access, keep an audit trail, and tighten financial control as you scale.',
   },
 ];
 
@@ -99,16 +99,16 @@ export default function HomePage() {
 
         <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
           <p className="text-xs font-medium uppercase tracking-wide text-cyan-300">
-            Cayman rental property operations
+            Property management software made for Cayman
           </p>
           <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
-            Run your whole rental operation from one workspace.
+            Stop chasing rent. Start running a tighter rental business.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
-            Rent, leases, maintenance, vendors, documents, reporting, and a
-            tenant portal — live today, built for Cayman landlords and property
-            managers with KYD currency, Cayman timezone defaults, and
-            bank-transfer rent workflows with proof and receipts.
+            Rent collected and reconciled, maintenance handled, tenants and
+            vendors in the loop, and your numbers always current — without the
+            spreadsheet sprawl. Built in Cayman for KYD, local timezones, and
+            bank-transfer rent with proof and receipts.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
@@ -134,11 +134,11 @@ export default function HomePage() {
             Available now
           </p>
           <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
-            Everything you need to operate a rental portfolio.
+            Less admin. Fewer disputes. Money where it should be.
           </h2>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            These capabilities are live in the product today — no waitlist, no
-            &ldquo;coming soon.&rdquo;
+            Every capability below is live in the product today — not a roadmap
+            promise, no waitlist, no &ldquo;coming soon.&rdquo;
           </p>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {capabilities.map((item) => (
@@ -164,7 +164,7 @@ export default function HomePage() {
               Who it is for
             </p>
             <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
-              From a single unit to a professional portfolio.
+              Whether you own one unit or run a hundred.
             </h2>
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               {audiences.map((item) => (
@@ -192,13 +192,14 @@ export default function HomePage() {
                 Built for Cayman
               </p>
               <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-                Local defaults, local workflows.
+                Built here — not adapted from abroad.
               </h2>
               <p className="mt-3 max-w-md text-base leading-7 text-slate-600">
-                KYD currency and Cayman timezone defaults out of the box, with
-                bank-transfer rent workflows backed by payment proof and
-                generated receipts — the way most Cayman tenancies actually
-                pay today.
+                Most tools assume US banking and USD and leave you working
+                around the gaps. CayRentManager defaults to KYD and Cayman
+                time, and fits how tenancies here actually pay — bank transfer,
+                payment proof, and a receipt the tenant can keep. Less
+                translation, fewer workarounds, faster days.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
@@ -221,7 +222,7 @@ export default function HomePage() {
                 On the roadmap
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Not yet shipped — what we are building next:
+                What we are building next — not available yet:
               </p>
               <ul className="mt-4 space-y-3">
                 {roadmap.map((item) => (
@@ -245,12 +246,12 @@ export default function HomePage() {
         <section className="border-t border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Get your workspace running today.
+              Put this weekend back on your calendar.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-slate-600">
-              Create a workspace and start tracking rent, leases, maintenance,
-              and vendors. Already have an account? Sign in to pick up where you
-              left off.
+              Set up your workspace and move rent, leases, maintenance, and
+              vendors off spreadsheets today. Already onboard? Sign in and pick
+              up right where you left off.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link
@@ -267,7 +268,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-6 text-sm text-slate-500">
-              Questions? Reach us at{' '}
+              Questions? Talk to us at{' '}
               <a
                 href="mailto:hello@cayrentmanager.com"
                 className="font-medium text-cyan-700 hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"

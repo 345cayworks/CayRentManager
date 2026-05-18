@@ -100,6 +100,37 @@ async function main() {
     create: { email: superadminEmail, name: 'Primary Superadmin', fullName: 'Primary Superadmin', role: UserRole.SUPERADMIN, status: UserStatus.ACTIVE },
   });
 
+  const officialPlans = [
+    { id: 'plan_starter_default', code: 'STARTER', name: 'Starter', amount: 49.0, minUnits: 1, maxUnits: 4 },
+    { id: 'plan_professional_default', code: 'PROFESSIONAL', name: 'Professional', amount: 99.0, minUnits: 5, maxUnits: 10 },
+    { id: 'plan_property_manager_default', code: 'PROPERTY_MANAGER', name: 'Property Manager', amount: 149.0, minUnits: 11, maxUnits: null },
+  ];
+  for (const plan of officialPlans) {
+    await prisma.subscriptionPlan.upsert({
+      where: { code: plan.code },
+      update: {
+        name: plan.name,
+        amount: plan.amount,
+        currency: 'KYD',
+        intervalMonths: 1,
+        minUnits: plan.minUnits,
+        maxUnits: plan.maxUnits,
+        status: RecordStatus.ACTIVE,
+      },
+      create: {
+        id: plan.id,
+        code: plan.code,
+        name: plan.name,
+        amount: plan.amount,
+        currency: 'KYD',
+        intervalMonths: 1,
+        minUnits: plan.minUnits,
+        maxUnits: plan.maxUnits,
+        status: RecordStatus.ACTIVE,
+      },
+    });
+  }
+
   await seedLandlord('landlord_a', 'owner+a@rentflow.test', 'Landlord A LLC', 'Apex Apartments', 'A-101');
   await seedLandlord('landlord_b', 'owner+b@rentflow.test', 'Landlord B LLC', 'Bayside Flats', 'B-201');
 

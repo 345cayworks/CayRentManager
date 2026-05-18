@@ -30,9 +30,6 @@ export default function PrivacyPage() {
           <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
             Privacy Policy
           </h1>
-          <p className="mt-3 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-            Draft — review by counsel before public launch
-          </p>
 
           <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
             <p className="text-sm leading-6 text-slate-600">

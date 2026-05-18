@@ -14,6 +14,7 @@ import {
   shouldGenerateFygaroPaymentLink,
   shouldGenerateSubscriptionInvoice,
 } from '@/lib/billing/policy';
+import { planMatchesUnitCount, recommendPlanForUnits } from '@/lib/billing/plan-rules';
 
 const THIRTY_DAYS_MS = 30 * 86_400_000;
 
@@ -527,6 +528,33 @@ export async function changeSubscriptionPlanAction(formData: FormData) {
   }
 
   const previousPlan = subscription.plan;
+
+  // Non-blocking plan/unit advisory. SuperAdmin override is always allowed;
+  // we only record a mismatch in the audit details for visibility.
+  const rawUnitCount = nullableText(formData, 'unitCount');
+  let planMismatchDetails: Prisma.JsonObject | null = null;
+  if (rawUnitCount !== null) {
+    const unitCount = Number.parseInt(rawUnitCount, 10);
+    if (Number.isFinite(unitCount) && unitCount > 0) {
+      const matches = planMatchesUnitCount(
+        { id: targetPlan.id, code: targetPlan.code, amount: targetPlan.amount, minUnits: targetPlan.minUnits, maxUnits: targetPlan.maxUnits, status: targetPlan.status },
+        unitCount,
+      );
+      if (!matches) {
+        const activePlans = await prisma.subscriptionPlan.findMany({ where: { status: RecordStatus.ACTIVE } });
+        const recommended = recommendPlanForUnits(
+          unitCount,
+          activePlans.map((p) => ({ id: p.id, code: p.code, amount: p.amount, minUnits: p.minUnits, maxUnits: p.maxUnits, status: p.status })),
+        );
+        planMismatchDetails = {
+          planMismatch: true,
+          unitCount,
+          recommended: recommended?.code ?? null,
+        };
+      }
+    }
+  }
+
   const data: Prisma.LandlordSubscriptionUpdateInput = { plan: { connect: { id: planId } } };
 
   if (effectiveAt === 'IMMEDIATE' && !isComplimentarySubscription(subscription)) {
@@ -557,6 +585,7 @@ export async function changeSubscriptionPlanAction(formData: FormData) {
       newAmount: targetPlan.amount.toString(),
       effectiveAt,
       note,
+      ...(planMismatchDetails ?? {}),
     },
   });
 

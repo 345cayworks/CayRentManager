@@ -109,6 +109,7 @@ Latest confirmed merged work includes:
 - Landlord⇄Vendor messaging (generalized inbox for tenants AND portal-linked vendors, landlord vendor thread + vendor-portal thread, vendor mark-read + nav badge; schema-free); Phase 5.3 marketplace "Request a quote" now actually delivers (in-app message to a portal-linked workspace copy of the global vendor, else queued email via the Phase 6 outbox, lead always recorded)
 - Vendor Portal Governance (landlord direct-enable removed; landlords submit a `VendorPortalRequest`, superadmin approves/rejects or directly enables; one-pending-per-vendor partial unique; landlord can cancel pending + disable enabled; `/admin/vendor-portal` review console)
 - Phase 10 polish foundation (responsive Shell with mobile drawer; global-error/error/not-found/loading boundaries; EmptyState + ConfirmButton on destructive actions + search-param Toaster; /terms + /privacy scaffolds + registration consent; backup/recovery + public-beta-checklist runbooks) plus housekeeping (marketplace section moved above "Add a vendor"; Rent Roll card removed from superadmin dashboard; full `.env.example`; base URL standardized on `NEXT_PUBLIC_APP_URL`)
+- Billing Phase 1 additive hardening (draft banner removed from /terms + /privacy; SubscriptionPlan minUnits/maxUnits + 3 official plans seeded; SubscriptionInvoice discount columns + SENT/PAID_BY_PROMO/VOID statuses; pure plan-rules + non-blocking plan/unit audit; markSubscriptionPaid intervalMonths/future-vs-expired math; billing-cron scheduled + complimentary/SuperAdmin/expired-complimentary hardening). Access codes deferred to Phase 2; registration subscription + enforcement + backfill deferred to Phase 3.
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -958,6 +959,43 @@ Remaining (iterative):
 - Superadmin dashboard: removed the Rent Roll quick-action card
 - `.env.example`: full grouped reference for all referenced vars; base URL
   standardized on `NEXT_PUBLIC_APP_URL` (`NEXT_PUBLIC_BASE_URL` removed)
+
+---
+
+## Billing — Phase 1
+
+Status:
+
+```text
+Shipped — additive hardening
+```
+
+Low-risk, additive billing/Fygaro hardening. See `docs/BILLING_PHASE1.md`
+for the full runbook, env vars, and manual QA checklist.
+
+Shipped:
+
+- Legal pages: removed the draft-review banner from `/terms` and `/privacy`
+  (legal sections unchanged)
+- `SubscriptionPlan.minUnits` / `maxUnits`; the 3 official plans
+  (Starter / Professional / Property Manager, KYD) are now idempotently
+  seeded via migration + `prisma/seed.ts` upsert
+- `SubscriptionInvoice.originalAmount` / `discountAmount` / `discountCode`;
+  `SubscriptionInvoiceStatus` gained `SENT`, `PAID_BY_PROMO`, `VOID`
+- Pure `src/lib/billing/plan-rules.ts` (`recommendPlanForUnits`,
+  `planMatchesUnitCount`, `computeRenewedPeriodEnd`) + unit tests
+- `changeSubscriptionPlanAction`: non-blocking plan/unit advisory recorded
+  in the audit details (SuperAdmin override always allowed; pricing still
+  always from `SubscriptionPlan.amount`)
+- `markSubscriptionPaid`: honors `plan.intervalMonths` with the
+  future-vs-expired extension rule; emits an `invoice_marked_paid` audit
+- `billing-cron`: scheduled (`0 6 * * *`, published deploys only),
+  explicit complimentary skip, expired-complimentary resume pass,
+  never INACTIVE-locks a SuperAdmin, per-row try/catch guard
+
+Deferred: access codes / referrals / promos / `/admin/growth`
+(Phase 2); registration-time subscription creation, access enforcement /
+`/billing-required` redirect, and subscription backfill (Phase 3).
 
 ---
 

@@ -120,6 +120,9 @@ enum SubscriptionInvoiceStatus {
   WAIVED
   OVERDUE
   PENDING_VERIFICATION
+  SENT
+  PAID_BY_PROMO
+  VOID
 }
 
 enum PaymentMethodType {
@@ -369,6 +372,8 @@ model SubscriptionPlan {
   amount         Decimal
   currency       String       @default("KYD")
   intervalMonths Int          @default(1)
+  minUnits       Int?
+  maxUnits       Int?
   status         RecordStatus @default(ACTIVE)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -406,6 +411,9 @@ model SubscriptionInvoice {
   landlordId       String
   invoiceNumber    String                    @unique
   amount           Decimal
+  originalAmount   Decimal?
+  discountAmount   Decimal?                  @default(0)
+  discountCode     String?
   currency         String                    @default("KYD")
   status           SubscriptionInvoiceStatus @default(OPEN)
   dueDate          DateTime

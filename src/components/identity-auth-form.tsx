@@ -61,7 +61,13 @@ export function IdentityAuthForm({
 
   useEffect(() => {
     if (mode === 'login' && searchParams?.get('registered')) {
-      setSuccessMessage('Registration successful. Please sign in to continue.');
+      setSuccessMessage(
+        'Registration successful. Check your email and click the confirmation link before signing in.',
+      );
+    } else if (mode === 'login' && searchParams?.get('confirmed') === '1') {
+      setSuccessMessage('Your email has been confirmed. You can now sign in.');
+    } else if (mode === 'login' && searchParams?.get('email_changed') === '1') {
+      setSuccessMessage('Your email change has been confirmed. Please sign in.');
     }
   }, [mode, searchParams]);
 

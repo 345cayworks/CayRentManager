@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { IdentityHashHandler } from '@/components/auth/identity-hash-handler';
 
 export const metadata: Metadata = {
   title: 'CayRentManager',
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <IdentityHashHandler />
+        {children}
+      </body>
     </html>
   );
 }

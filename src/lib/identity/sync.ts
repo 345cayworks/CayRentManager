@@ -1,5 +1,7 @@
 import { RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
+import { ensureLandlordSubscription } from '@/lib/billing/subscription-bootstrap';
+import { linkCapturedRedemptionsForLandlord } from '@/lib/billing/access-code-apply';
 
 export type IdentitySyncInput = {
   netlifyUserId: string;
@@ -135,6 +137,14 @@ export async function syncIdentityUser(input: IdentitySyncInput) {
       },
     });
 
+    // Best-effort subscription bootstrap. MUST NOT prevent the
+    // user/landlord transaction from committing.
+    try {
+      await ensureLandlordSubscription(tx, landlord.id);
+    } catch {
+      // Swallow: auth path is non-fatal for subscription bootstrap.
+    }
+
     await tx.auditLog.createMany({
       data: [
         { actorUserId: user.id, actorEmail: user.email, action: 'identity_user_synced', entityType: 'User', entityId: user.id, details: {} },
@@ -144,6 +154,28 @@ export async function syncIdentityUser(input: IdentitySyncInput) {
 
     return { user, landlord };
   });
+
+  // Post-commit, best-effort: link any PENDING access-code redemptions
+  // captured at signup and apply their registrant benefit. Never throws
+  // out of the auth path.
+  try {
+    const linked = await linkCapturedRedemptionsForLandlord(result.landlord.id, email, result.user.id);
+    if (linked > 0) {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: result.user.id,
+          actorEmail: result.user.email,
+          action: 'access_code_redeemed',
+          entityType: 'LandlordProfile',
+          entityId: result.landlord.id,
+          landlordId: result.landlord.id,
+          details: { source: 'registration_capture_link', linked },
+        },
+      });
+    }
+  } catch {
+    // Swallow: redemption linking must never block login/signup.
+  }
 
   return { user: { ...result.user, memberships: [] }, createdWorkspace: true };
 }

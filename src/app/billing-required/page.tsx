@@ -4,7 +4,8 @@ import { prisma } from '@/lib/db/prisma';
 import { isBillingTableMissingError } from '@/lib/billing/safe-query';
 
 export default async function BillingRequiredPage() {
-  const { landlordId } = await getCurrentLandlordWorkspace();
+  // Skip the billing gate here or we would redirect into ourselves.
+  const { landlordId } = await getCurrentLandlordWorkspace({ skipBillingGate: true });
   let subscription: any = null;
   try {
     subscription = await prisma.landlordSubscription.findUnique({ where: { landlordId }, include: { invoices: { where: { status: { in: ['OPEN', 'OVERDUE', 'PENDING_VERIFICATION'] } }, orderBy: { createdAt: 'desc' }, take: 1 } } });

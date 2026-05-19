@@ -1,5 +1,7 @@
 import { RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
+import { ensureLandlordSubscription } from '@/lib/billing/subscription-bootstrap';
+import { linkCapturedRedemptionsForLandlord } from '@/lib/billing/access-code-apply';
 
 type RegisterLandlordInput = {
   email: string;
@@ -11,7 +13,7 @@ type RegisterLandlordInput = {
 export async function registerPublicLandlord(input: RegisterLandlordInput) {
   const email = input.email.trim().toLowerCase();
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.user.findUnique({
       where: { email },
       include: {
@@ -53,6 +55,27 @@ export async function registerPublicLandlord(input: RegisterLandlordInput) {
       },
     });
 
-    return { user, landlord };
+    // Best-effort subscription bootstrap. MUST NOT prevent the
+    // user/landlord transaction from committing.
+    try {
+      await ensureLandlordSubscription(tx, landlord.id);
+    } catch {
+      // Swallow: registration is non-fatal for subscription bootstrap.
+    }
+
+    return { user, landlord, createdNow: true };
   });
+
+  // Post-commit, best-effort: link any PENDING access-code redemptions
+  // captured at signup and apply their registrant benefit. Never throws
+  // out of the registration path.
+  if (result.createdNow) {
+    try {
+      await linkCapturedRedemptionsForLandlord(result.landlord.id, email, result.user.id);
+    } catch {
+      // Swallow: redemption linking must never block registration.
+    }
+  }
+
+  return { user: result.user, landlord: result.landlord };
 }

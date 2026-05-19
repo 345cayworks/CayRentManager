@@ -9,6 +9,7 @@ import { SubscriptionStatus } from '@prisma/client';
 import Link from 'next/link';
 import { prisma } from '@/lib/db/prisma';
 import { isBillingTableMissingError } from '@/lib/billing/safe-query';
+import { isComplimentarySubscription } from '@/lib/billing/policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +27,16 @@ export default async function DashboardPage() {
     if (!isBillingTableMissingError(error)) throw error;
   }
 
+  const complimentary = subscription ? isComplimentarySubscription(subscription) : false;
+
   return (
     <Shell title={`${membership.landlord.displayName} Dashboard`}>
-      {subscription && (subscription.status === SubscriptionStatus.PAST_DUE || subscription.status === SubscriptionStatus.GRACE_PERIOD) && (
+      {complimentary && (
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+          Your account is complimentary — no payment is due.
+        </div>
+      )}
+      {subscription && !complimentary && (subscription.status === SubscriptionStatus.PAST_DUE || subscription.status === SubscriptionStatus.GRACE_PERIOD) && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
           Payment overdue. You have {subscription.gracePeriodEndsAt ? Math.max(0, Math.ceil((subscription.gracePeriodEndsAt.getTime() - Date.now()) / 86400000)) : 0} days left before account access is paused.
           {subscription.invoices[0]?.fygaroPaymentUrl && <Link className="ml-3 underline" href={subscription.invoices[0].fygaroPaymentUrl}>Pay Now</Link>}

@@ -111,6 +111,7 @@ Latest confirmed merged work includes:
 - Phase 10 polish foundation (responsive Shell with mobile drawer; global-error/error/not-found/loading boundaries; EmptyState + ConfirmButton on destructive actions + search-param Toaster; /terms + /privacy scaffolds + registration consent; backup/recovery + public-beta-checklist runbooks) plus housekeeping (marketplace section moved above "Add a vendor"; Rent Roll card removed from superadmin dashboard; full `.env.example`; base URL standardized on `NEXT_PUBLIC_APP_URL`)
 - Billing Phase 1 additive hardening (draft banner removed from /terms + /privacy; SubscriptionPlan minUnits/maxUnits + 3 official plans seeded; SubscriptionInvoice discount columns + SENT/PAID_BY_PROMO/VOID statuses; pure plan-rules + non-blocking plan/unit audit; markSubscriptionPaid intervalMonths/future-vs-expired math; billing-cron scheduled + complimentary/SuperAdmin/expired-complimentary hardening). Access codes deferred to Phase 2; registration subscription + enforcement + backfill deferred to Phase 3.
 - Billing Phase 2 access-code / referral / promo system (AccessCode + AccessCodeRedemption models + 4 enums + idempotent migration; pure validator + benefit/discount math with tests; public `/api/access-code/validate` + best-effort email-keyed PENDING signup capture that never blocks signup; SuperAdmin `/admin/growth` center with code CRUD, redemptions/reverse, apply-to-existing-landlord, manual referrer reward; reuses Phase 1 invoice/complimentary fields). Auto-apply at registration + linking email redemptions + automatic referrer payout deferred to Phase 3.
+- Billing Phase 3 subscription bootstrap + dark-gated enforcement (non-fatal `ensureLandlordSubscription` TRIAL 30d/STARTER wired into `syncIdentityUser` + `registerPublicLandlord` so it never blocks auth; idempotent backfill migration for existing landlords; shared `access-code-apply` service with Phase 2 SuperAdmin actions refactored onto it; captured PENDING redemptions linked + applied at landlord creation; referrer payout on first paid invoice, best-effort, never breaks `markSubscriptionPaid`; access enforcement SHIPS DARK behind `BILLING_ENFORCEMENT_ENABLED` (default off) — only INACTIVE non-complimentary landlords redirect to `/billing-required`, SUPERADMIN/no-sub/PAST_DUE/GRACE never blocked, billing-required + account/billing bypass the gate). Operator must verify backfill then set `BILLING_ENFORCEMENT_ENABLED=true` to activate lockout — see `docs/BILLING_PHASE3.md`.
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -1027,6 +1028,51 @@ Shipped:
 Deferred to Phase 3: auto-applying captured codes at registration /
 subscription creation, linking email-keyed PENDING redemptions to the new
 landlord/user, automatic referrer payout on the first paid invoice.
+
+---
+
+## Billing — Phase 3
+
+Status:
+
+```text
+Shipped — subscription bootstrap + dark-gated access enforcement
+```
+
+Gated, highest-risk track. Safety rule: nothing here may break login/signup
+or lock anyone out by default. See `docs/BILLING_PHASE3.md` for the full
+operator rollout checklist.
+
+Shipped:
+
+- `src/lib/billing/subscription-bootstrap.ts → ensureLandlordSubscription`
+  (TRIAL 30d on STARTER, idempotent, non-fatal — returns null on any error)
+  wired non-fatally into `syncIdentityUser` (createdWorkspace branch) and
+  `registerPublicLandlord`; auth/registration always commits even if it fails
+- Idempotent backfill migration
+  `20260519000100_backfill-landlord-subscriptions` (TRIAL subscription for
+  every ACTIVE landlord lacking one; no schema changes)
+- Shared `src/lib/billing/access-code-apply.ts`
+  (`applyRegistrantBenefitForRedemption`,
+  `applyReferrerRewardForRedemption`,
+  `linkCapturedRedemptionsForLandlord`); the Phase 2 SuperAdmin actions were
+  refactored onto it with unchanged admin behavior/audits
+- Captured PENDING redemptions linked + applied when the landlord is created
+  (post-commit, best-effort per redemption, audited only when ≥1 linked);
+  referrer payout on the first paid invoice in `markSubscriptionPaid`
+  (best-effort — payment confirmation can never fail because of it)
+- Access enforcement SHIPS DARK behind `BILLING_ENFORCEMENT_ENABLED`
+  (default OFF). Pure `src/lib/billing/enforcement.ts`; only `INACTIVE`
+  non-complimentary landlords redirect to `/billing-required`. SUPERADMIN /
+  no-subscription / PAST_DUE / GRACE_PERIOD / TRIAL / complimentary never
+  blocked. `getCurrentLandlordWorkspace({ skipBillingGate: true })` on
+  `/billing-required` + `/account/billing` prevents a redirect loop.
+- `tests/billing-enforcement.test.ts` (pure) covers the flag + decision
+  matrix; dashboard banner suppresses overdue for complimentary accounts
+
+Operator action required: deploy, verify the backfill ran and every active
+landlord has a TRIAL subscription, then set `BILLING_ENFORCEMENT_ENABLED=true`
+in the Netlify dashboard to activate lockout.
 
 ---
 

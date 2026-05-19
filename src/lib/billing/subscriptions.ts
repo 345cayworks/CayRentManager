@@ -6,6 +6,7 @@ import {
   shouldGenerateSubscriptionInvoice,
 } from '@/lib/billing/policy';
 import { computeRenewedPeriodEnd } from '@/lib/billing/plan-rules';
+import { applyReferrerRewardForRedemption } from '@/lib/billing/access-code-apply';
 
 export function createSubscriptionInvoiceNumber() {
   return `CRM-INV-${new Date().getUTCFullYear()}-${Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0')}`;
@@ -107,5 +108,49 @@ export async function markSubscriptionPaid(invoiceId: string, providerReference?
     }
     await tx.billingPaymentEvent.create({ data: { subscriptionInvoiceId: invoice.id, eventType: 'payment_confirmed', providerReference: providerReference ?? undefined, payload: payload as Prisma.JsonObject | undefined } });
   });
+
+  // Best-effort referrer payout on the FIRST paid invoice for this
+  // subscription. MUST NOT break payment confirmation.
+  if (invoice.subscriptionId) {
+    try {
+      const paidCount = await prisma.subscriptionInvoice.count({
+        where: { subscriptionId: invoice.subscriptionId, status: SubscriptionInvoiceStatus.PAID },
+      });
+      if (paidCount === 1) {
+        const redemption = await prisma.accessCodeRedemption.findFirst({
+          where: {
+            subscriptionId: invoice.subscriptionId,
+            status: 'APPLIED',
+            referrerUserId: { not: null },
+            referrerBenefitApplied: { equals: Prisma.AnyNull },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (redemption) {
+          await applyReferrerRewardForRedemption(redemption.id);
+          const landlord = await prisma.landlordProfile.findUnique({ where: { id: invoice.landlordId } });
+          if (landlord) {
+            const owner = await prisma.user.findUnique({ where: { id: landlord.ownerUserId } });
+            if (owner) {
+              await prisma.auditLog.create({
+                data: {
+                  landlordId: invoice.landlordId,
+                  actorUserId: owner.id,
+                  actorEmail: owner.email,
+                  action: 'referral_reward_applied',
+                  entityType: 'AccessCodeRedemption',
+                  entityId: redemption.id,
+                  details: { source: 'first_paid_invoice', invoiceId: invoice.id },
+                },
+              });
+            }
+          }
+        }
+      }
+    } catch {
+      // Swallow: payment confirmation must never fail due to referrer payout.
+    }
+  }
+
   return true;
 }

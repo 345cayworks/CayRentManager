@@ -8,8 +8,10 @@ import {
 } from '@prisma/client';
 import { requireSuperadmin } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { computeRenewedPeriodEnd } from '@/lib/billing/plan-rules';
-import { computeDiscountedInvoice } from '@/lib/billing/access-codes';
+import {
+  applyReferrerRewardForRedemption,
+  applyRegistrantBenefitForRedemption,
+} from '@/lib/billing/access-code-apply';
 
 const REVALIDATE = '/admin/growth';
 
@@ -83,12 +85,6 @@ function asReward(value: string): AccessCodeRewardType {
 function asRewardOrNull(value: string | null): AccessCodeRewardType | null {
   if (!value) return null;
   return asReward(value);
-}
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setUTCMonth(d.getUTCMonth() + Math.max(0, Math.floor(months)));
-  return d;
 }
 
 async function audit(
@@ -334,127 +330,20 @@ export async function applyAccessCodeToLandlordAction(formData: FormData) {
   const actor = await requireSuperadmin();
   const target = await resolveRedemptionTarget(formData);
   const { accessCode, landlordId } = target;
-  const now = new Date();
 
-  // Hard self-referral block.
+  // Hard self-referral block (also enforced inside the shared service).
   if (
     (accessCode.referrerLandlordId && accessCode.referrerLandlordId === landlordId)
   ) {
     throw new Error('Self-referral is not permitted.');
   }
 
-  const subscription = await prisma.landlordSubscription.findUnique({
-    where: { landlordId },
-    include: { plan: true },
-  });
-  if (!subscription) {
-    throw new Error('That landlord has no subscription. Code cannot be applied yet.');
-  }
-
-  const benefit: Record<string, unknown> = {
-    rewardType: accessCode.rewardType,
-    code: accessCode.code,
-    appliedBy: actor.userId,
-    appliedAt: now.toISOString(),
-  };
-  let invoiceId: string | null = null;
-  const notes: string[] = [];
-
-  if (
-    accessCode.rewardType === 'PERCENT_DISCOUNT' ||
-    accessCode.rewardType === 'FIXED_DISCOUNT'
-  ) {
-    const invoice = await prisma.subscriptionInvoice.findFirst({
-      where: {
-        subscriptionId: subscription.id,
-        status: { in: ['DRAFT', 'OPEN', 'SENT', 'OVERDUE', 'PENDING_VERIFICATION'] },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (invoice) {
-      const base = Number(invoice.amount);
-      const math = computeDiscountedInvoice(
-        base,
-        accessCode.rewardType,
-        accessCode.rewardValue,
-        accessCode.rewardMonths,
-      );
-      await prisma.subscriptionInvoice.update({
-        where: { id: invoice.id },
-        data: {
-          originalAmount: new Prisma.Decimal(math.originalAmount),
-          discountAmount: new Prisma.Decimal(math.discountAmount),
-          discountCode: accessCode.code,
-          amount: new Prisma.Decimal(math.finalAmount),
-          status: math.zeroDueToBenefit ? 'PAID_BY_PROMO' : invoice.status,
-        },
-      });
-      invoiceId = invoice.id;
-      benefit.discountAmount = math.discountAmount;
-      benefit.finalAmount = math.finalAmount;
-    } else {
-      notes.push('Discount pending next invoice (no open invoice found).');
-      benefit.pending = 'next-invoice';
-    }
-  } else if (accessCode.rewardType === 'FREE_MONTHS') {
-    const months = accessCode.rewardMonths && accessCode.rewardMonths > 0
-      ? accessCode.rewardMonths
-      : 1;
-    const newEnd = computeRenewedPeriodEnd(subscription.currentPeriodEnd, months, now);
-    await prisma.landlordSubscription.update({
-      where: { id: subscription.id },
-      data: { currentPeriodEnd: newEnd, nextInvoiceAt: newEnd },
-    });
-    const promoInvoice = await prisma.subscriptionInvoice.create({
-      data: {
-        subscriptionId: subscription.id,
-        landlordId,
-        invoiceNumber: `PROMO-${accessCode.code}-${Date.now()}`,
-        amount: new Prisma.Decimal(0),
-        originalAmount: subscription.plan.amount,
-        discountAmount: subscription.plan.amount,
-        discountCode: accessCode.code,
-        currency: subscription.plan.currency,
-        status: 'PAID_BY_PROMO',
-        dueDate: now,
-        paidAt: now,
-      },
-    });
-    invoiceId = promoInvoice.id;
-    benefit.freeMonths = months;
-    benefit.newPeriodEnd = newEnd.toISOString();
-  } else if (accessCode.rewardType === 'COMPLIMENTARY_ACCESS') {
-    const until = accessCode.rewardMonths && accessCode.rewardMonths > 0
-      ? addMonths(now, accessCode.rewardMonths)
-      : null;
-    await prisma.landlordSubscription.update({
-      where: { id: subscription.id },
-      data: {
-        isComplimentary: true,
-        status: 'COMPLIMENTARY',
-        complimentaryReason: `Access code: ${accessCode.code}`,
-        complimentaryUntil: until,
-        complimentaryByUserId: actor.userId,
-      },
-    });
-    benefit.complimentaryUntil = until ? until.toISOString() : null;
-  } else {
-    // ACCOUNT_CREDIT / UNIT_LIMIT_BONUS / TRIAL_EXTENSION / MANUAL_REVIEW.
-    notes.push(`${accessCode.rewardType}: recorded as intent (no destructive change).`);
-    benefit.recordedIntent = true;
-  }
-
-  await prisma.accessCodeRedemption.update({
-    where: { id: target.redemptionId },
-    data: {
-      status: 'APPLIED',
-      appliedAt: now,
-      registrantLandlordId: landlordId,
-      subscriptionId: subscription.id,
-      invoiceId,
-      registrantBenefitApplied: benefit as Prisma.InputJsonValue,
-      notes: notes.length ? notes.join(' ') : undefined,
-    },
+  // Shared benefit core. `force` preserves the pre-refactor SuperAdmin
+  // behaviour (the admin action never gated on redemption status).
+  await applyRegistrantBenefitForRedemption(target.redemptionId, {
+    appliedByUserId: actor.userId,
+    landlordId,
+    force: true,
   });
 
   await audit(actor.userId, actor.email, 'access_code_redeemed', accessCode.id, {
@@ -541,7 +430,7 @@ export async function applyReferrerRewardAction(formData: FormData) {
     throw new Error('This redemption has no referrer.');
   }
 
-  // Hard self-referral block.
+  // Hard self-referral block (also enforced inside the shared service).
   if (
     (redemption.referrerLandlordId &&
       redemption.referrerLandlordId === redemption.registrantLandlordId) ||
@@ -551,49 +440,8 @@ export async function applyReferrerRewardAction(formData: FormData) {
     throw new Error('Self-referral is not permitted.');
   }
 
-  const accessCode = await prisma.accessCode.findUnique({
-    where: { id: redemption.accessCodeId },
-  });
-  if (!accessCode) throw new Error('Access code not found.');
-
-  const now = new Date();
-  const referrerBenefit: Record<string, unknown> = {
-    referrerRewardType: accessCode.referrerRewardType,
-    appliedBy: actor.userId,
-    appliedAt: now.toISOString(),
-  };
-  const notes: string[] = [];
-
-  if (accessCode.referrerRewardType === 'FREE_MONTHS' && redemption.referrerLandlordId) {
-    const sub = await prisma.landlordSubscription.findUnique({
-      where: { landlordId: redemption.referrerLandlordId },
-    });
-    if (sub) {
-      const months = accessCode.referrerRewardMonths && accessCode.referrerRewardMonths > 0
-        ? accessCode.referrerRewardMonths
-        : 1;
-      const newEnd = computeRenewedPeriodEnd(sub.currentPeriodEnd, months, now);
-      await prisma.landlordSubscription.update({
-        where: { id: sub.id },
-        data: { currentPeriodEnd: newEnd, nextInvoiceAt: newEnd },
-      });
-      referrerBenefit.freeMonths = months;
-      referrerBenefit.newPeriodEnd = newEnd.toISOString();
-    } else {
-      notes.push('Referrer has no subscription — reward recorded as intent.');
-    }
-  } else {
-    notes.push(
-      `${accessCode.referrerRewardType ?? 'MANUAL_REVIEW'}: recorded as intent for manual handling.`,
-    );
-  }
-
-  await prisma.accessCodeRedemption.update({
-    where: { id: redemptionId },
-    data: {
-      referrerBenefitApplied: referrerBenefit as Prisma.InputJsonValue,
-      notes: [redemption.notes, ...notes].filter(Boolean).join(' ') || undefined,
-    },
+  await applyReferrerRewardForRedemption(redemptionId, {
+    appliedByUserId: actor.userId,
   });
 
   await audit(actor.userId, actor.email, 'referral_reward_applied', redemption.accessCodeId, {

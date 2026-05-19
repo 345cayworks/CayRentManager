@@ -30,7 +30,8 @@ const payableInvoiceStatuses: ReadonlySet<SubscriptionInvoiceStatus> = new Set([
 ]);
 
 export default async function AccountBillingPage() {
-  const workspace = await getCurrentLandlordWorkspace();
+  // Skip the billing gate: a blocked landlord must still reach this page to pay.
+  const workspace = await getCurrentLandlordWorkspace({ skipBillingGate: true });
   const tz = await getEffectiveTimezone();
 
   let subscription: any = null;

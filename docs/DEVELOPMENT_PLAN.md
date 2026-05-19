@@ -112,6 +112,7 @@ Latest confirmed merged work includes:
 - Billing Phase 1 additive hardening (draft banner removed from /terms + /privacy; SubscriptionPlan minUnits/maxUnits + 3 official plans seeded; SubscriptionInvoice discount columns + SENT/PAID_BY_PROMO/VOID statuses; pure plan-rules + non-blocking plan/unit audit; markSubscriptionPaid intervalMonths/future-vs-expired math; billing-cron scheduled + complimentary/SuperAdmin/expired-complimentary hardening). Access codes deferred to Phase 2; registration subscription + enforcement + backfill deferred to Phase 3.
 - Billing Phase 2 access-code / referral / promo system (AccessCode + AccessCodeRedemption models + 4 enums + idempotent migration; pure validator + benefit/discount math with tests; public `/api/access-code/validate` + best-effort email-keyed PENDING signup capture that never blocks signup; SuperAdmin `/admin/growth` center with code CRUD, redemptions/reverse, apply-to-existing-landlord, manual referrer reward; reuses Phase 1 invoice/complimentary fields). Auto-apply at registration + linking email redemptions + automatic referrer payout deferred to Phase 3.
 - Billing Phase 3 subscription bootstrap + dark-gated enforcement (non-fatal `ensureLandlordSubscription` TRIAL 30d/STARTER wired into `syncIdentityUser` + `registerPublicLandlord` so it never blocks auth; idempotent backfill migration for existing landlords; shared `access-code-apply` service with Phase 2 SuperAdmin actions refactored onto it; captured PENDING redemptions linked + applied at landlord creation; referrer payout on first paid invoice, best-effort, never breaks `markSubscriptionPaid`; access enforcement SHIPS DARK behind `BILLING_ENFORCEMENT_ENABLED` (default off) — only INACTIVE non-complimentary landlords redirect to `/billing-required`, SUPERADMIN/no-sub/PAST_DUE/GRACE never blocked, billing-required + account/billing bypass the gate). Operator must verify backfill then set `BILLING_ENFORCEMENT_ENABLED=true` to activate lockout — see `docs/BILLING_PHASE3.md`.
+- Tenant invite email (best-effort): `buildTenantInviteEmail` pure builder (text + escaped HTML, digest card style) + tests; `sendTenantInviteEmail` queues via the Phase 6 Resend outbox and drains promptly, fully best-effort (try/catch-swallowed, never throws out of `createTenantInvitation`, copyable link stays the fallback). Auto-sends from both invite paths (`inviteTenantAction` + guided wizard); `resendTenantInviteAction` + "Resend email" on `/tenants`. No schema change, no new deps; requires `NOTIFICATION_PROVIDER=resend` + `RESEND_API_KEY` + `NOTIFICATION_FROM_EMAIL` to actually deliver, safely log-only otherwise — see `docs/TENANT_INVITE_EMAIL.md`.
 - Billing Phase 4 Fygaro webhook hardening + payment idempotency (`verifyFygaroWebhookSignature` now FAILS CLOSED — returns false when `FYGARO_WEBHOOK_SECRET` is unset/empty instead of insecurely accepting any unsigned webhook; supports constant-time HMAC-SHA256 hex/base64/base64url + HS256 JWT schemes via reusable `verifyFygaroJwt`; never throws; header single-sourced as exported `FYGARO_SIGNATURE_HEADER` and imported by the route, which warns + 401s when the secret is missing. `markSubscriptionPaid` is now idempotent: already-PAID invoices record a `duplicate_webhook_ignored` event and return without re-extending; the genuine first PAID transition is race-safe via conditional `updateMany`, and the Phase 3 first-paid referrer payout still runs only on that genuine first payment). Operator must confirm Fygaro's real webhook scheme/header in the Fygaro dashboard and set `FYGARO_WEBHOOK_SECRET` — see `docs/BILLING_PHASE4.md`.
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
@@ -799,6 +800,18 @@ Build:
 - escalation rules — DONE: per-workspace `EscalationPolicy` with platform defaults, pure unit-tested evaluator (threshold + severity gate + repeat cadence + idempotent levels), team-member resolution by membership role, hourly `alert-escalation-scan.ts`
 
 See `docs/PHASE6_NOTIFICATION_COMPLETION.md` for the escalation model, level math, channel/env matrix, and skipped notes.
+
+### Tenant invite email (best-effort, reuses the Phase 6 outbox)
+
+Tenant invitations now auto-email the invitee. `buildTenantInviteEmail` is a
+pure builder (escaped HTML, digest card style); `sendTenantInviteEmail` queues
+via `queueEmailNotification` and drains promptly. Wired at the service level in
+`createTenantInvitation` so both `inviteTenantAction` and the guided wizard are
+covered. Fully best-effort — try/catch-swallowed, never throws out of invite
+creation, copyable link remains the fallback; the accept flow and token are
+untouched. `resendTenantInviteAction` powers a "Resend email" button on
+`/tenants`. Requires the Resend env to actually deliver, safely log-only
+otherwise. See `docs/TENANT_INVITE_EMAIL.md`.
 
 ---
 

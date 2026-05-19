@@ -68,19 +68,67 @@ export async function createInvoiceForSubscription(subscriptionId: string, dueDa
   });
 }
 
+/**
+ * Pure idempotency decision: a payment must only be applied (subscription
+ * extended) on the FIRST transition into PAID. If the invoice is already
+ * PAID a duplicate/retried webhook is a no-op.
+ */
+export function isInvoiceAlreadyPaid(status: SubscriptionInvoiceStatus | string): boolean {
+  return status === SubscriptionInvoiceStatus.PAID;
+}
+
 export async function markSubscriptionPaid(invoiceId: string, providerReference?: string | null, payload?: unknown) {
   const invoice = await prisma.subscriptionInvoice.findUnique({
     where: { id: invoiceId },
     include: { subscription: { include: { plan: true } } },
   });
   if (!invoice) return null;
+
+  // Idempotency: a duplicate / retried Fygaro webhook must NOT re-extend the
+  // subscription. If this invoice is already PAID, record a best-effort
+  // duplicate event and return without mutating the subscription/user.
+  if (isInvoiceAlreadyPaid(invoice.status)) {
+    try {
+      await prisma.billingPaymentEvent.create({
+        data: {
+          subscriptionInvoiceId: invoice.id,
+          eventType: 'duplicate_webhook_ignored',
+          providerReference: providerReference ?? undefined,
+          payload: payload as Prisma.JsonObject | undefined,
+        },
+      });
+    } catch {
+      // Best-effort: never fail webhook handling on the duplicate-marker write.
+    }
+    return true;
+  }
+
   const now = new Date();
   const subscription = invoice.subscription;
   const intervalMonths = subscription?.plan?.intervalMonths ?? 1;
   const currentPeriodEnd = subscription?.currentPeriodEnd ?? now;
   const newEnd = computeRenewedPeriodEnd(currentPeriodEnd, intervalMonths, now);
+  let appliedAsFirstPayment = false;
   await prisma.$transaction(async (tx) => {
-    await tx.subscriptionInvoice.update({ where: { id: invoice.id }, data: { status: SubscriptionInvoiceStatus.PAID, paidAt: now, fygaroPaymentId: providerReference ?? undefined } });
+    // Conditional update guards against a concurrent webhook that already
+    // flipped the invoice to PAID between our read above and this write.
+    // count === 0 => another request won the race => idempotent no-op.
+    const claimed = await tx.subscriptionInvoice.updateMany({
+      where: { id: invoice.id, status: { not: SubscriptionInvoiceStatus.PAID } },
+      data: { status: SubscriptionInvoiceStatus.PAID, paidAt: now, fygaroPaymentId: providerReference ?? undefined },
+    });
+    if (claimed.count === 0) {
+      await tx.billingPaymentEvent.create({
+        data: {
+          subscriptionInvoiceId: invoice.id,
+          eventType: 'duplicate_webhook_ignored',
+          providerReference: providerReference ?? undefined,
+          payload: payload as Prisma.JsonObject | undefined,
+        },
+      });
+      return;
+    }
+    appliedAsFirstPayment = true;
     await tx.landlordSubscription.update({
       where: { id: invoice.subscriptionId },
       data: {
@@ -110,8 +158,10 @@ export async function markSubscriptionPaid(invoiceId: string, providerReference?
   });
 
   // Best-effort referrer payout on the FIRST paid invoice for this
-  // subscription. MUST NOT break payment confirmation.
-  if (invoice.subscriptionId) {
+  // subscription. Only when THIS call performed the genuine first PAID
+  // transition (never on a duplicate/retried webhook). MUST NOT break
+  // payment confirmation.
+  if (appliedAsFirstPayment && invoice.subscriptionId) {
     try {
       const paidCount = await prisma.subscriptionInvoice.count({
         where: { subscriptionId: invoice.subscriptionId, status: SubscriptionInvoiceStatus.PAID },

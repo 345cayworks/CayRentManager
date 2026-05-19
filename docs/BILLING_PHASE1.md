@@ -99,7 +99,7 @@ Applied in order; all idempotent:
 | `FYGARO_BUTTON_URL` | Base Fygaro payment button URL |
 | `FYGARO_SECRET_KEY` | Fygaro JWT signing secret |
 | `FYGARO_KID` or `FYGARO_PUBLIC_KEY` | Fygaro key id / public key for JWT |
-| `FYGARO_WEBHOOK_SECRET` | Validates inbound Fygaro webhook |
+| `FYGARO_WEBHOOK_SECRET` | Validates inbound Fygaro webhook. **REQUIRED** — webhook handler fails closed (rejects all webhooks) when unset; see `docs/BILLING_PHASE4.md` |
 | `NEXT_PUBLIC_APP_URL` | Canonical app base URL (return/links) |
 
 Documentation item (not wired in Phase 1): `FYGARO_CURRENCY` is currently

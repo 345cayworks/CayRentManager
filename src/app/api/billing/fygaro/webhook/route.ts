@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { isBillingTableMissingError } from '@/lib/billing/safe-query';
 import { markSubscriptionPaid } from '@/lib/billing/subscriptions';
-import { verifyFygaroWebhookSignature } from '@/lib/billing/fygaro';
+import { verifyFygaroWebhookSignature, FYGARO_SIGNATURE_HEADER } from '@/lib/billing/fygaro';
 
 export async function POST(req: Request) {
   const raw = await req.text();
-  const signature = req.headers.get('x-fygaro-signature');
+  const signature = req.headers.get(FYGARO_SIGNATURE_HEADER);
+  if (!process.env.FYGARO_WEBHOOK_SECRET) {
+    console.warn('[fygaro-webhook] FYGARO_WEBHOOK_SECRET not configured — rejecting webhook');
+  }
   if (!verifyFygaroWebhookSignature(raw, signature)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }

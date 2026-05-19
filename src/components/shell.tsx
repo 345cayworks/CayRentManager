@@ -19,6 +19,7 @@ const adminLinks: NavLink[] = [
   { href: '/admin/vendors', label: 'Vendors' },
   { href: '/admin/vendor-portal', label: 'Vendor Portal' },
   { href: '/admin/billing', label: 'Billing' },
+  { href: '/admin/growth', label: 'Growth' },
   { href: '/admin/audit', label: 'Audit' },
   { href: '/admin/safety', label: 'Safety' },
   { href: '/account/profile', label: 'Profile' },

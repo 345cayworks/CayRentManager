@@ -110,6 +110,7 @@ Latest confirmed merged work includes:
 - Vendor Portal Governance (landlord direct-enable removed; landlords submit a `VendorPortalRequest`, superadmin approves/rejects or directly enables; one-pending-per-vendor partial unique; landlord can cancel pending + disable enabled; `/admin/vendor-portal` review console)
 - Phase 10 polish foundation (responsive Shell with mobile drawer; global-error/error/not-found/loading boundaries; EmptyState + ConfirmButton on destructive actions + search-param Toaster; /terms + /privacy scaffolds + registration consent; backup/recovery + public-beta-checklist runbooks) plus housekeeping (marketplace section moved above "Add a vendor"; Rent Roll card removed from superadmin dashboard; full `.env.example`; base URL standardized on `NEXT_PUBLIC_APP_URL`)
 - Billing Phase 1 additive hardening (draft banner removed from /terms + /privacy; SubscriptionPlan minUnits/maxUnits + 3 official plans seeded; SubscriptionInvoice discount columns + SENT/PAID_BY_PROMO/VOID statuses; pure plan-rules + non-blocking plan/unit audit; markSubscriptionPaid intervalMonths/future-vs-expired math; billing-cron scheduled + complimentary/SuperAdmin/expired-complimentary hardening). Access codes deferred to Phase 2; registration subscription + enforcement + backfill deferred to Phase 3.
+- Billing Phase 2 access-code / referral / promo system (AccessCode + AccessCodeRedemption models + 4 enums + idempotent migration; pure validator + benefit/discount math with tests; public `/api/access-code/validate` + best-effort email-keyed PENDING signup capture that never blocks signup; SuperAdmin `/admin/growth` center with code CRUD, redemptions/reverse, apply-to-existing-landlord, manual referrer reward; reuses Phase 1 invoice/complimentary fields). Auto-apply at registration + linking email redemptions + automatic referrer payout deferred to Phase 3.
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -996,6 +997,36 @@ Shipped:
 Deferred: access codes / referrals / promos / `/admin/growth`
 (Phase 2); registration-time subscription creation, access enforcement /
 `/billing-required` redirect, and subscription backfill (Phase 3).
+
+## Billing — Phase 2
+
+Status:
+
+```text
+Shipped — access-code / referral / promo system
+```
+
+Greenfield + additive, medium risk, no lockout. See `docs/BILLING_PHASE2.md`
+for the full runbook.
+
+Shipped:
+
+- `AccessCode` + `AccessCodeRedemption` models, 4 enums, idempotent
+  migration (`20260518000100_billing-phase2-access-codes`) with a partial
+  unique guard against duplicate PENDING captures per code+email
+- Pure `src/lib/billing/access-codes.ts` validator + benefit/discount math
+  (+ `tests/access-codes.test.ts`) and DB wrapper `access-code-lookup.ts`
+- Public `POST /api/access-code/validate` + best-effort signup capture via
+  `POST /api/access-code/redeem-intent` (email-keyed PENDING, never blocks
+  signup, no AuditLog as there is no user actor yet)
+- SuperAdmin Growth center at `/admin/growth` (added to admin nav after
+  Billing): code CRUD, pause/archive/reactivate, redemptions + reverse,
+  apply-to-existing-landlord, manual referrer reward — all audited; reuses
+  Phase 1 invoice-discount + complimentary fields
+
+Deferred to Phase 3: auto-applying captured codes at registration /
+subscription creation, linking email-keyed PENDING redemptions to the new
+landlord/user, automatic referrer payout on the first paid invoice.
 
 ---
 

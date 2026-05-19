@@ -48,6 +48,10 @@ export function IdentityAuthForm({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [accessCodeNote, setAccessCodeNote] = useState<
+    { kind: 'ok' | 'warn'; text: string } | null
+  >(null);
   const [message, setMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -77,6 +81,34 @@ export function IdentityAuthForm({
       .then(async (user) => { if (!user) return; await syncSession(user); })
       .catch(() => undefined);
   }, []);
+
+  // Best-effort live preview of a referral / promo code. Never blocks signup.
+  useEffect(() => {
+    if (mode !== 'signup') { return; }
+    const code = accessCode.trim();
+    if (!code) { setAccessCodeNote(null); return; }
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      fetch('/api/access-code/validate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code, email: email.trim() }),
+      })
+        .then((response) => response.json().catch(() => null))
+        .then((data) => {
+          if (cancelled || !data) { return; }
+          if (data.ok && typeof data.preview === 'string') {
+            setAccessCodeNote({ kind: 'ok', text: data.preview });
+          } else if (typeof data.reason === 'string') {
+            setAccessCodeNote({ kind: 'warn', text: data.reason });
+          } else {
+            setAccessCodeNote(null);
+          }
+        })
+        .catch(() => { if (!cancelled) { setAccessCodeNote(null); } });
+    }, 450);
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [mode, accessCode, email]);
 
   async function syncSession(user: any) {
     const response = await fetch('/api/identity/session', {
@@ -110,6 +142,20 @@ export function IdentityAuthForm({
             throw new Error('An account with this email already exists. Please sign in instead.');
           }
           throw new Error(getIdentityErrorMessage(signupError));
+        }
+        // Best-effort referral / promo capture. Email-keyed PENDING redemption.
+        // Wrapped so signup ALWAYS proceeds regardless of any failure.
+        const codeToCapture = accessCode.trim();
+        if (codeToCapture) {
+          try {
+            await fetch('/api/access-code/redeem-intent', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ code: codeToCapture, email: email.trim() }),
+            }).catch(() => undefined);
+          } catch {
+            // Swallow all errors: signup must never fail because of code capture.
+          }
         }
         // Registration succeeded - redirect to login without session sync.
         // Netlify Identity session is not available immediately after signup.
@@ -200,6 +246,24 @@ export function IdentityAuthForm({
                 .
               </span>
             </label>
+            <div className="grid gap-1">
+              <input
+                value={accessCode}
+                onChange={(event) => setAccessCode(event.target.value)}
+                placeholder="Referral or promo code (optional)"
+                className={inputClassName}
+                autoComplete="off"
+              />
+              {accessCodeNote ? (
+                <p
+                  className={`text-xs ${
+                    accessCodeNote.kind === 'ok' ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                >
+                  {accessCodeNote.text}
+                </p>
+              ) : null}
+            </div>
           </>
         ) : null}
         {passwordValidation ? <p className="text-xs text-amber-700">{passwordValidation}</p> : null}

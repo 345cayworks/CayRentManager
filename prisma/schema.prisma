@@ -125,6 +125,39 @@ enum SubscriptionInvoiceStatus {
   VOID
 }
 
+enum AccessCodeType {
+  PROMO
+  REFERRAL
+  PARTNER
+  INTERNAL
+  COMPLIMENTARY
+}
+
+enum AccessCodeRewardType {
+  PERCENT_DISCOUNT
+  FIXED_DISCOUNT
+  FREE_MONTHS
+  TRIAL_EXTENSION
+  COMPLIMENTARY_ACCESS
+  ACCOUNT_CREDIT
+  UNIT_LIMIT_BONUS
+  MANUAL_REVIEW
+}
+
+enum AccessCodeStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+  ARCHIVED
+}
+
+enum AccessCodeRedemptionStatus {
+  PENDING
+  APPLIED
+  REVERSED
+  REJECTED
+}
+
 enum PaymentMethodType {
   BANK_TRANSFER
   CASH
@@ -379,6 +412,68 @@ model SubscriptionPlan {
   updatedAt      DateTime     @updatedAt
 
   subscriptions LandlordSubscription[]
+  accessCodes   AccessCode[]
+}
+
+model AccessCode {
+  id                           String                @id @default(cuid())
+  code                         String                @unique
+  type                         AccessCodeType
+  status                       AccessCodeStatus      @default(ACTIVE)
+  description                  String?
+  campaignName                 String?
+  startsAt                     DateTime?
+  expiresAt                    DateTime?
+  maxRedemptions               Int?
+  maxRedemptionsPerEmail       Int                   @default(1)
+  rewardType                   AccessCodeRewardType
+  rewardValue                  Decimal?
+  rewardMonths                 Int?
+  rewardUnitLimit              Int?
+  appliesToPlanId              String?
+  isStackable                  Boolean               @default(false)
+  referrerUserId               String?
+  referrerLandlordId           String?
+  registrantBenefitDescription String?
+  referrerRewardType           AccessCodeRewardType?
+  referrerRewardValue          Decimal?
+  referrerRewardMonths         Int?
+  createdByUserId              String?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+
+  appliesToPlan SubscriptionPlan?      @relation(fields: [appliesToPlanId], references: [id])
+  redemptions   AccessCodeRedemption[]
+
+  @@index([status])
+  @@index([type])
+  @@index([code])
+}
+
+model AccessCodeRedemption {
+  id                       String                     @id @default(cuid())
+  accessCodeId             String
+  code                     String
+  registrantEmail          String
+  registrantUserId         String?
+  registrantLandlordId     String?
+  referrerUserId           String?
+  referrerLandlordId       String?
+  subscriptionId           String?
+  invoiceId                String?
+  status                   AccessCodeRedemptionStatus @default(PENDING)
+  registrantBenefitApplied Json?
+  referrerBenefitApplied   Json?
+  appliedAt                DateTime?
+  reversedAt               DateTime?
+  notes                    String?
+  createdAt                DateTime                   @default(now())
+
+  accessCode AccessCode @relation(fields: [accessCodeId], references: [id])
+
+  @@index([accessCodeId])
+  @@index([registrantEmail])
+  @@index([status])
 }
 
 model LandlordSubscription {

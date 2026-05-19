@@ -114,6 +114,7 @@ Latest confirmed merged work includes:
 - Billing Phase 3 subscription bootstrap + dark-gated enforcement (non-fatal `ensureLandlordSubscription` TRIAL 30d/STARTER wired into `syncIdentityUser` + `registerPublicLandlord` so it never blocks auth; idempotent backfill migration for existing landlords; shared `access-code-apply` service with Phase 2 SuperAdmin actions refactored onto it; captured PENDING redemptions linked + applied at landlord creation; referrer payout on first paid invoice, best-effort, never breaks `markSubscriptionPaid`; access enforcement SHIPS DARK behind `BILLING_ENFORCEMENT_ENABLED` (default off) — only INACTIVE non-complimentary landlords redirect to `/billing-required`, SUPERADMIN/no-sub/PAST_DUE/GRACE never blocked, billing-required + account/billing bypass the gate). Operator must verify backfill then set `BILLING_ENFORCEMENT_ENABLED=true` to activate lockout — see `docs/BILLING_PHASE3.md`.
 - Tenant invite email (best-effort): `buildTenantInviteEmail` pure builder (text + escaped HTML, digest card style) + tests; `sendTenantInviteEmail` queues via the Phase 6 Resend outbox and drains promptly, fully best-effort (try/catch-swallowed, never throws out of `createTenantInvitation`, copyable link stays the fallback). Auto-sends from both invite paths (`inviteTenantAction` + guided wizard); `resendTenantInviteAction` + "Resend email" on `/tenants`. No schema change, no new deps; requires `NOTIFICATION_PROVIDER=resend` + `RESEND_API_KEY` + `NOTIFICATION_FROM_EMAIL` to actually deliver, safely log-only otherwise — see `docs/TENANT_INVITE_EMAIL.md`.
 - Billing Phase 4 Fygaro webhook hardening + payment idempotency (`verifyFygaroWebhookSignature` now FAILS CLOSED — returns false when `FYGARO_WEBHOOK_SECRET` is unset/empty instead of insecurely accepting any unsigned webhook; supports constant-time HMAC-SHA256 hex/base64/base64url + HS256 JWT schemes via reusable `verifyFygaroJwt`; never throws; header single-sourced as exported `FYGARO_SIGNATURE_HEADER` and imported by the route, which warns + 401s when the secret is missing. `markSubscriptionPaid` is now idempotent: already-PAID invoices record a `duplicate_webhook_ignored` event and return without re-extending; the genuine first PAID transition is race-safe via conditional `updateMany`, and the Phase 3 first-paid referrer payout still runs only on that genuine first payment). Operator must confirm Fygaro's real webhook scheme/header in the Fygaro dashboard and set `FYGARO_WEBHOOK_SECRET` — see `docs/BILLING_PHASE4.md`.
+- Digital Tenant Applications (greenfield): `TenantApplicationLink` + `TenantApplication` models + `TenantApplicationStatus` enum + idempotent migration; pure rules helpers (`canDecide`/`nextStatuses`/`isLinkOpen`) with tests; public no-auth `/apply/[token]` submission (structured fields only, no anonymous uploads) with `?submitted=1` state + best-effort landlord notify; landlord `/applications` (create/manage scoped links with copyable URL + activate toggle, status-filtered list) and `/applications/[id]` (review/decide gated by the pure helpers, withdraw); approving reuses `createTenantInvitation` best-effort (also emails the applicant) and stores/surfaces the invitation link; all landlord actions workspace-scoped + audited; Applications nav entry. Marketing page: removed the "On the roadmap" card (the Built-for-Cayman block now stands alone), realigned the audience section to the real 3 plans (Small Landlords/Professional/Property Managers with exact KYD prices + unit ranges + a single accurate 30-day-trial note), and added a "Screen applicants before they move in" card to "Available now". No new deps; emails best-effort/log-only without the Resend env — see `docs/TENANT_APPLICATIONS.md`.
 
 Latest confirmed `main` after registration workflow tightening was merged in PR #30. The merge commit is documented in GitHub as `931c47717691bdefce7037a2337dddd339c51d7b`.
 
@@ -405,6 +406,7 @@ Future enhancements (out of scope for Phase 2 closeout):
 /terms
 /privacy
 /invite/[token]
+/apply/[token]
 /unauthorized
 ```
 
@@ -441,6 +443,8 @@ Note:
 /properties
 /units
 /tenants
+/applications
+/applications/[id]
 /leases
 /payments
 /payments/settings
@@ -930,6 +934,28 @@ Build:
 - landlords may cancel their own pending request and still disable an enabled portal (safe de-escalation); `disableVendorPortalAction` now allows the owning landlord OR superadmin
 - request lifecycle PENDING → APPROVED/REJECTED/CANCELLED; partial unique index enforces one pending request per vendor
 - see `docs/VENDOR_PORTAL_GOVERNANCE.md`
+
+---
+
+### Digital Tenant Applications
+
+Status:
+
+```text
+Complete
+```
+
+Build:
+
+- `TenantApplicationLink` + `TenantApplication` models + `TenantApplicationStatus` enum; idempotent migration `20260520000100_tenant-applications` (enum DO-block, two `CREATE TABLE IF NOT EXISTS`, FKs + indexes)
+- pure rules in `src/lib/applications/application-rules.ts` (`canDecide`, `nextStatuses`, `isLinkOpen`) with `tests/application-rules.test.ts`
+- public, no-auth `/apply/[token]` submission — structured fields only, **no anonymous file uploads by design** (documents collected post-approval via the document vault); `?submitted=1` thank-you state
+- `submitTenantApplicationAction` (public): resolves the link, enforces `isLinkOpen`, creates the application, best-effort landlord notify via the Phase 6 outbox (never blocks submission), redirects to the success state
+- landlord `/applications` (create/manage workspace-scoped links with shareable `${NEXT_PUBLIC_APP_URL}/apply/{token}` URL + `CopyInviteLinkButton` + activate/deactivate toggle; status-filterable list) and `/applications/[id]` (full detail; Mark under review / Approve / Reject-with-note / Withdraw gated by the pure helpers; created invitation link surfaced when approved)
+- approving calls `createTenantInvitation` best-effort (reuses the existing invitation service which also emails the applicant via the Phase 6 outbox); the invitation id is stored on the application; invite failure never breaks the decision
+- all landlord actions strictly workspace-scoped + audited (`application_link_created`, `application_link_updated`, `application_decided`, `application_withdrawn`); Applications nav entry after Tenants
+- marketing page realigned: "On the roadmap" card removed (Built-for-Cayman block stands alone), audience section replaced with the real 3 plans (exact KYD prices + unit ranges + one accurate 30-day-trial note), and a "Screen applicants before they move in" card added to "Available now"
+- no new deps; emails best-effort/log-only without `NOTIFICATION_PROVIDER=resend` + `RESEND_API_KEY` + `NOTIFICATION_FROM_EMAIL` — see `docs/TENANT_APPLICATIONS.md`
 
 ---
 

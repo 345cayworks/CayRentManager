@@ -45,29 +45,31 @@ const capabilities: { title: string; copy: string }[] = [
     title: 'Control as you grow',
     copy: 'Role-based access for managers and accountants, a full audit trail, and per-workspace currency and timezone — without enterprise overhead.',
   },
-];
-
-const audiences: { title: string; copy: string }[] = [
   {
-    title: 'Small landlords',
-    copy: 'You did not get into property to live in spreadsheets. Track rent, receipts, and repairs for 1–10 units in minutes a week — and look professional doing it.',
-  },
-  {
-    title: 'Property managers',
-    copy: 'Juggling owners, tenants, and vendors across a portfolio? Keep every unit, payment, and service request straight — and turn owner reporting into a one-click export.',
-  },
-  {
-    title: 'Growing portfolios',
-    copy: 'Outgrowing what spreadsheets can hold? Add managers and accountants with the right access, keep an audit trail, and tighten financial control as you scale.',
+    title: 'Screen applicants before they move in',
+    copy: 'Share a branded application link; collect applicant details and references; review, approve, and convert to a tenant invite in a click.',
   },
 ];
 
-const roadmap: string[] = [
-  'Live card-payment gateways for tenant rent (Fygaro / CNB / Butterfield) — tenant rent is bank-transfer + proof today',
-  'Vacation / short-term rental operations, guest portals, and calendar sync',
-  'Digital tenant application workflows',
-  'AI insights and predictive alerts',
-  'Short-term-rental tax automation and owner statements',
+const plans: { name: string; price: string; range: string; copy: string }[] = [
+  {
+    name: 'Small Landlords',
+    price: 'Starter · KYD $49/mo',
+    range: '1–4 units',
+    copy: 'Everything to run a handful of units without spreadsheets.',
+  },
+  {
+    name: 'Professional',
+    price: 'Professional · KYD $99/mo',
+    range: '5–10 units',
+    copy: 'More units, more vendors, same tight control and reporting.',
+  },
+  {
+    name: 'Property Managers',
+    price: 'Property Manager · KYD $149/mo',
+    range: '11+ units',
+    copy: 'Multi-user access, audit trail, and portfolio-wide visibility.',
+  },
 ];
 
 export default function HomePage() {
@@ -161,21 +163,31 @@ export default function HomePage() {
         <section className="border-y border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20">
             <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">
-              Who it is for
+              Plans
             </p>
             <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
-              Whether you own one unit or run a hundred.
+              Pick the tier that fits your portfolio.
             </h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+              Three straightforward plans in KYD, sized by units under
+              management. Starts with a 30-day trial.
+            </p>
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              {audiences.map((item) => (
+              {plans.map((item) => (
                 <article
-                  key={item.title}
+                  key={item.name}
                   className="rounded-xl border border-slate-200 bg-white p-6"
                 >
                   <h3 className="text-base font-semibold text-slate-900">
-                    {item.title}
+                    {item.name}
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm font-medium text-cyan-700">
+                    {item.price}
+                  </p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+                    {item.range}
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
                     {item.copy}
                   </p>
                 </article>
@@ -184,61 +196,34 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Cayman + roadmap */}
-        <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20">
-          <div className="grid gap-12 lg:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">
-                Built for Cayman
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-                Built here — not adapted from abroad.
-              </h2>
-              <p className="mt-3 max-w-md text-base leading-7 text-slate-600">
-                Most tools assume US banking and USD and leave you working
-                around the gaps. CayRentManager defaults to KYD and Cayman
-                time, and fits how tenancies here actually pay — bank transfer,
-                payment proof, and a receipt the tenant can keep. Less
-                translation, fewer workarounds, faster days.
-              </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/register"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-cyan-700 px-6 text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
-                >
-                  Create your workspace
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
-                >
-                  Sign in
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                On the roadmap
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                What we are building next — not available yet:
-              </p>
-              <ul className="mt-4 space-y-3">
-                {roadmap.map((item) => (
-                  <li
-                    key={item}
-                    className="flex gap-3 text-sm leading-6 text-slate-600"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-slate-400"
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        {/* Built for Cayman */}
+        <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20">
+          <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">
+            Built for Cayman
+          </p>
+          <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+            Built here — not adapted from abroad.
+          </h2>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+            Most tools assume US banking and USD and leave you working around
+            the gaps. CayRentManager defaults to KYD and Cayman time, and fits
+            how tenancies here actually pay — bank transfer, payment proof, and
+            a receipt the tenant can keep. Less translation, fewer workarounds,
+            faster days.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/register"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-cyan-700 px-6 text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
+            >
+              Create your workspace
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
+            >
+              Sign in
+            </Link>
           </div>
         </section>
 

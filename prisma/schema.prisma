@@ -205,6 +205,14 @@ enum InvitationStatus {
   REVOKED
 }
 
+enum TenantApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
 enum LeaseAlertSnapshotStatus {
   ACTIVE
   REVIEWED
@@ -331,32 +339,34 @@ model LandlordProfile {
   archivedAt                DateTime?
   archivedBy                String?
 
-  owner                 User                   @relation("LandlordOwner", fields: [ownerUserId], references: [id])
-  memberships           LandlordMembership[]
-  properties            Property[]
-  units                 Unit[]
-  tenants               Tenant[]
-  invitations           TenantInvitation[]
-  leases                Lease[]
-  payments              Payment[]
-  invoices              Invoice[]
-  paymentMethods        PaymentMethod[]
-  bankAccounts          BankAccount[]
-  expenses              Expense[]
-  maintenanceRequests   MaintenanceRequest[]
-  maintenanceVendors    MaintenanceVendor[]
-  documents             Document[]
-  messages              Message[]
-  auditLogs             AuditLog[]
-  leaseAlertSnapshots   LeaseAlertSnapshot[]
-  subscriptions         LandlordSubscription[]
-  subscriptionInvoices  SubscriptionInvoice[]
-  alertPreferences      AlertPreference[]
-  outboundNotifications OutboundNotification[]
-  escalationPolicy      EscalationPolicy?
-  alertEscalations      AlertEscalation[]
-  globalVendorLeads     GlobalVendorLead[]
-  vendorPortalRequests  VendorPortalRequest[]
+  owner                  User                    @relation("LandlordOwner", fields: [ownerUserId], references: [id])
+  memberships            LandlordMembership[]
+  properties             Property[]
+  units                  Unit[]
+  tenants                Tenant[]
+  invitations            TenantInvitation[]
+  leases                 Lease[]
+  payments               Payment[]
+  invoices               Invoice[]
+  paymentMethods         PaymentMethod[]
+  bankAccounts           BankAccount[]
+  expenses               Expense[]
+  maintenanceRequests    MaintenanceRequest[]
+  maintenanceVendors     MaintenanceVendor[]
+  documents              Document[]
+  messages               Message[]
+  auditLogs              AuditLog[]
+  leaseAlertSnapshots    LeaseAlertSnapshot[]
+  subscriptions          LandlordSubscription[]
+  subscriptionInvoices   SubscriptionInvoice[]
+  alertPreferences       AlertPreference[]
+  outboundNotifications  OutboundNotification[]
+  escalationPolicy       EscalationPolicy?
+  alertEscalations       AlertEscalation[]
+  globalVendorLeads      GlobalVendorLead[]
+  vendorPortalRequests   VendorPortalRequest[]
+  tenantApplicationLinks TenantApplicationLink[]
+  tenantApplications     TenantApplication[]
 }
 
 model EscalationPolicy {
@@ -574,16 +584,18 @@ model Property {
   archivedAt     DateTime?
   archivedBy     String?
 
-  landlord            LandlordProfile      @relation(fields: [landlordId], references: [id])
-  units               Unit[]
-  invitations         TenantInvitation[]
-  leases              Lease[]
-  payments            Payment[]
-  invoices            Invoice[]
-  expenses            Expense[]
-  maintenanceRequests MaintenanceRequest[]
-  documents           Document[]
-  photos              PropertyPhoto[]
+  landlord               LandlordProfile         @relation(fields: [landlordId], references: [id])
+  units                  Unit[]
+  invitations            TenantInvitation[]
+  leases                 Lease[]
+  payments               Payment[]
+  invoices               Invoice[]
+  expenses               Expense[]
+  maintenanceRequests    MaintenanceRequest[]
+  documents              Document[]
+  photos                 PropertyPhoto[]
+  tenantApplicationLinks TenantApplicationLink[]
+  tenantApplications     TenantApplication[]
 }
 
 model Unit {
@@ -602,16 +614,18 @@ model Unit {
   archivedAt    DateTime?
   archivedBy    String?
 
-  landlord            LandlordProfile      @relation(fields: [landlordId], references: [id])
-  property            Property             @relation(fields: [propertyId], references: [id])
-  invitations         TenantInvitation[]
-  leases              Lease[]
-  payments            Payment[]
-  invoices            Invoice[]
-  expenses            Expense[]
-  maintenanceRequests MaintenanceRequest[]
-  documents           Document[]
-  photos              UnitPhoto[]
+  landlord               LandlordProfile         @relation(fields: [landlordId], references: [id])
+  property               Property                @relation(fields: [propertyId], references: [id])
+  invitations            TenantInvitation[]
+  leases                 Lease[]
+  payments               Payment[]
+  invoices               Invoice[]
+  expenses               Expense[]
+  maintenanceRequests    MaintenanceRequest[]
+  documents              Document[]
+  photos                 UnitPhoto[]
+  tenantApplicationLinks TenantApplicationLink[]
+  tenantApplications     TenantApplication[]
 }
 
 model PropertyPhoto {
@@ -698,6 +712,61 @@ model TenantInvitation {
   landlord LandlordProfile @relation(fields: [landlordId], references: [id])
   property Property?       @relation(fields: [propertyId], references: [id])
   unit     Unit?           @relation(fields: [unitId], references: [id])
+}
+
+model TenantApplicationLink {
+  id              String    @id @default(cuid())
+  landlordId      String
+  propertyId      String?
+  unitId          String?
+  token           String    @unique
+  label           String?
+  active          Boolean   @default(true)
+  expiresAt       DateTime?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  landlord     LandlordProfile     @relation(fields: [landlordId], references: [id])
+  property     Property?           @relation(fields: [propertyId], references: [id])
+  unit         Unit?               @relation(fields: [unitId], references: [id])
+  applications TenantApplication[]
+
+  @@index([landlordId])
+  @@index([token])
+}
+
+model TenantApplication {
+  id                  String                  @id @default(cuid())
+  linkId              String?
+  landlordId          String
+  propertyId          String?
+  unitId              String?
+  applicantName       String
+  email               String
+  phone               String?
+  currentAddress      String?
+  employer            String?
+  monthlyIncome       Decimal?
+  desiredMoveIn       DateTime?
+  occupants           Int?
+  references          String?
+  notes               String?
+  status              TenantApplicationStatus @default(SUBMITTED)
+  decisionByUserId    String?
+  decisionAt          DateTime?
+  decisionNote        String?
+  createdInvitationId String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  link     TenantApplicationLink? @relation(fields: [linkId], references: [id])
+  landlord LandlordProfile        @relation(fields: [landlordId], references: [id])
+  property Property?              @relation(fields: [propertyId], references: [id])
+  unit     Unit?                  @relation(fields: [unitId], references: [id])
+
+  @@index([landlordId, status])
+  @@index([linkId])
 }
 
 model Lease {

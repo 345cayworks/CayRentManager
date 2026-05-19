@@ -10,7 +10,7 @@ import { computeSlaDueAt } from '@/lib/maintenance/sla';
 import { assertTransition } from '@/lib/maintenance/workorder';
 import { createInvoiceForLease, applyPaymentToInvoice, generateReceiptForPayment } from '@/lib/payments/invoices';
 import { registerPublicLandlord } from '@/lib/services/registration';
-import { acceptTenantInvitation, createTenantInvitation } from '@/lib/services/invitations';
+import { acceptTenantInvitation, createTenantInvitation, sendTenantInviteEmail } from '@/lib/services/invitations';
 import { createCsvContent, createSafeCsvFilename } from '@/lib/utils/csv';
 import { calculatePaymentBalance, calculatePaymentStatus, validatePaymentDates } from '@/lib/validation/payments';
 import { isSupportedCurrency, isSupportedTimezone } from '@/lib/time/format';
@@ -334,6 +334,22 @@ export async function inviteTenantAction(formData: FormData) {
 
   const invitation = await createTenantInvitation(landlordId, requiredText(formData, 'email'), propertyId, unitId);
   await audit(user.userId, user.email, 'tenant.invited', 'TenantInvitation', invitation.id, landlordId, { email: invitation.email });
+  revalidatePath('/tenants');
+}
+
+export async function resendTenantInviteAction(formData: FormData) {
+  const { user, landlordId } = await getCurrentLandlordWorkspace();
+  const invitationId = requiredText(formData, 'invitationId');
+
+  const invitation = await prisma.tenantInvitation.findFirst({
+    where: { id: invitationId, landlordId, status: 'PENDING' },
+  });
+  if (!invitation) {
+    throw new Error('Invitation not found or no longer pending.');
+  }
+
+  await sendTenantInviteEmail(invitationId);
+  await audit(user.userId, user.email, 'tenant.invite_email_resent', 'TenantInvitation', invitationId, landlordId);
   revalidatePath('/tenants');
 }
 

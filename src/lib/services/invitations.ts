@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
 import { InvitationStatus, RecordStatus, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
+import { buildTenantInviteEmail } from '@/lib/notifications/invite-email';
+import { processOutboundNotifications, queueEmailNotification } from '@/lib/notifications/outbox';
 
 export async function createTenantInvitation(landlordId: string, email: string, propertyId?: string, unitId?: string) {
-  return prisma.tenantInvitation.create({
+  const invitation = await prisma.tenantInvitation.create({
     data: {
       landlordId,
       email: email.toLowerCase(),
@@ -14,6 +16,72 @@ export async function createTenantInvitation(landlordId: string, email: string, 
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
     },
   });
+
+  // Best-effort: emailing must never break invite creation. sendTenantInviteEmail
+  // is internally try/catch-wrapped and never throws, but we also keep the
+  // create result returned unchanged regardless of email outcome.
+  await sendTenantInviteEmail(invitation.id);
+
+  return invitation;
+}
+
+/**
+ * Best-effort tenant-invite email. Reuses the Phase 6 outbox: queues a PENDING
+ * notification then drains it promptly so the invite sends without waiting for
+ * the daily digest cron. Fully swallows any error — it must NEVER throw, so a
+ * failed or unconfigured email can never break invite creation. The copyable
+ * invite link on /tenants remains the fallback.
+ */
+export async function sendTenantInviteEmail(invitationId: string): Promise<void> {
+  try {
+    const invitation = await prisma.tenantInvitation.findUnique({
+      where: { id: invitationId },
+      include: {
+        landlord: { select: { displayName: true, timezone: true } },
+        unit: { include: { property: true } },
+        property: true,
+      },
+    });
+    if (!invitation) {
+      console.warn(`[tenant-invite-email] failed for ${invitationId}: invitation not found`);
+      return;
+    }
+
+    const locationLabel = invitation.unit
+      ? `${invitation.unit.property.name} / ${invitation.unit.unitName}`
+      : invitation.property
+        ? invitation.property.name
+        : null;
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '');
+    const invitePath = `/invite/${invitation.inviteToken}`;
+    const inviteUrl = appUrl ? `${appUrl}${invitePath}` : invitePath;
+
+    const landlordName = invitation.landlord?.displayName?.trim() || 'Your landlord';
+    const timezone = invitation.landlord?.timezone || 'America/Cayman';
+
+    const { subject, body, bodyHtml } = buildTenantInviteEmail({
+      landlordName,
+      locationLabel,
+      inviteUrl,
+      expiresAt: invitation.expiresAt,
+      timezone,
+    });
+
+    await queueEmailNotification({
+      landlordId: invitation.landlordId,
+      recipientEmail: invitation.email,
+      subject,
+      body,
+      bodyHtml,
+      notificationKind: 'TENANT_INVITE',
+      relatedAlertKeys: [],
+    });
+
+    await processOutboundNotifications({ limit: 5 });
+  } catch (err) {
+    console.warn(`[tenant-invite-email] failed for ${invitationId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 export async function acceptTenantInvitation(token: string, authEmail: string, fullName: string, netlifyUserId?: string) {

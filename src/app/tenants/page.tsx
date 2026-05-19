@@ -4,7 +4,7 @@ import { Shell } from '@/components/shell';
 import { ConfirmButton } from '@/components/ui/confirm-button';
 import { getCurrentLandlordWorkspace } from '@/lib/auth/guards';
 import { prisma } from '@/lib/db/prisma';
-import { deactivateTenantAction, inviteTenantAction } from '@/server/actions';
+import { deactivateTenantAction, inviteTenantAction, resendTenantInviteAction } from '@/server/actions';
 import { CopyInviteLinkButton } from '@/components/copy-invite-link';
 import { getEffectiveTimezone } from '@/lib/time/effective';
 import { formatDateTime } from '@/lib/time/format';
@@ -80,7 +80,7 @@ export default async function Page() {
           <div className="p-4">
             <p className="font-medium">Tenant invitations</p>
             <p className="mt-2 text-sm text-slate-600">
-              Email sending is not enabled yet. Copy the invite link and send it to the tenant manually.
+              An invite email is sent automatically. You can also copy the link below or resend the email.
             </p>
           </div>
           {invitations.length === 0 ? (
@@ -126,7 +126,20 @@ export default async function Page() {
                       className="mt-2 w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
                     />
                   </div>
-                  <CopyInviteLinkButton inviteUrl={inviteUrl} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CopyInviteLinkButton inviteUrl={inviteUrl} />
+                    {invite.status === 'PENDING' ? (
+                      <form action={resendTenantInviteAction}>
+                        <input type="hidden" name="invitationId" value={invite.id} />
+                        <button
+                          type="submit"
+                          className="text-sm rounded border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:bg-slate-50"
+                        >
+                          Resend email
+                        </button>
+                      </form>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             );
